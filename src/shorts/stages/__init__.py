@@ -1,5 +1,6 @@
 """Pipeline stages — each an independent, replaceable step."""
 
+from .assembly import VideoAssembler
 from .assets import AssetCollector
 from .metadata import MetadataGenerator
 from .script import ScriptGenerator
@@ -12,6 +13,7 @@ __all__ = [
     "AssetValidator",
     "MetadataGenerator",
     "ScriptGenerator",
+    "VideoAssembler",
     "VisualPlanner",
     "VoiceGenerator",
 ]

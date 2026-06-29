@@ -18,6 +18,8 @@ dependencies = [
     "feedparser>=6.0",
     "openai>=1.30",
     "edge-tts>=6.1",
+    "moviepy>=2.1",
+    "imageio-ffmpeg>=0.5",
 ]
 
 [project.scripts]

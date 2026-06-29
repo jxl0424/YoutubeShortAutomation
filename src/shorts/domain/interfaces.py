@@ -17,6 +17,8 @@ from trend_intelligence.domain.interfaces import LLMProvider
 
 from .models import (
     GeneratedShort,
+    RenderedVideo,
+    RenderRequest,
     Scene,
     UploadResult,
     VideoMetadata,
@@ -33,6 +35,7 @@ __all__ = [
     "LLMProvider",
     "VoiceProvider",
     "VisualProvider",
+    "VideoRenderer",
     "StorageProvider",
     "UploadProvider",
     "PipelineStage",
@@ -70,6 +73,17 @@ class VisualProvider(ABC):
     @abstractmethod
     def fetch(self, scene: Scene, output_dir: Path) -> VisualAsset:
         """Return a local asset satisfying the scene's visual requirements."""
+
+
+class VideoRenderer(ABC):
+    """Assembles the final video from audio + visuals. Default is MoviePy/FFmpeg;
+    new styles/engines implement this without changing the assembly stage."""
+
+    name: ClassVar[str]
+
+    @abstractmethod
+    def render(self, request: RenderRequest) -> RenderedVideo:
+        """Render the request to a video file and return its metadata."""
 
 
 class StorageProvider(ABC):

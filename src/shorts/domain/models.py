@@ -143,8 +143,35 @@ class AssetValidationReport(_Model):
 
 
 # --------------------------------------------------------------------------- #
-# Render + thumbnail
+# Render request (renderer input) + outputs
 # --------------------------------------------------------------------------- #
+class RenderScene(_Model):
+    """One timed visual segment for the renderer."""
+
+    asset_path: Path
+    visual_type: VisualType
+    duration_seconds: float = Field(gt=0)
+    on_screen_text: str | None = None
+
+
+class RenderRequest(_Model):
+    """Everything the renderer needs — decouples the renderer from the pipeline."""
+
+    output_path: Path
+    width: int = Field(gt=0)
+    height: int = Field(gt=0)
+    fps: int = Field(gt=0)
+    bitrate: str
+    audio_path: Path
+    scenes: list[RenderScene] = Field(default_factory=list)
+    subtitle_path: Path | None = None
+    ken_burns: bool = True
+    transitions: bool = True
+    burn_subtitles: bool = True
+    music_path: Path | None = None
+    music_volume: float = Field(default=0.15, ge=0.0, le=1.0)
+
+
 class RenderedVideo(_Model):
     path: Path
     width: int = Field(gt=0)
