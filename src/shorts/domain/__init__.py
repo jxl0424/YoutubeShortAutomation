@@ -12,6 +12,7 @@ from .exceptions import (
     StageError,
     UploadError,
     VisualError,
+    VisualPlanningError,
     VoiceError,
 )
 from .interfaces import (
@@ -81,5 +82,6 @@ __all__ = [
     "StageError",
     "UploadError",
     "VisualError",
+    "VisualPlanningError",
     "VoiceError",
 ]

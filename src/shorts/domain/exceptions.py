@@ -31,6 +31,10 @@ class VoiceError(StageError):
     """Voice synthesis failed."""
 
 
+class VisualPlanningError(StageError):
+    """The scene plan could not be built."""
+
+
 class VisualError(StageError):
     """Asset collection/generation failed."""
 
