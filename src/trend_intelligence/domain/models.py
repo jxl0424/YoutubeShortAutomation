@@ -7,7 +7,7 @@ never leak outside it. All scores are normalized to the range ``0.0 - 1.0``.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -16,7 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 def utcnow() -> datetime:
     """Timezone-aware current time (UTC). Centralized for easy testing."""
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 # --------------------------------------------------------------------------- #
@@ -143,7 +143,7 @@ class TrendProviderResult(_Model):
         provider: TrendSource,
         error: str,
         execution_time_ms: float = 0.0,
-    ) -> "TrendProviderResult":
+    ) -> TrendProviderResult:
         return cls(
             provider=provider,
             success=False,

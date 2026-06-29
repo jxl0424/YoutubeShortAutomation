@@ -79,9 +79,7 @@ class LocalFileCache(TrendCache):
         _logger.debug("cache_hit", namespace=namespace, key=key)
         return payload.get("value")
 
-    def set(
-        self, namespace: str, key: str, value: Any, ttl: int | None = None
-    ) -> None:
+    def set(self, namespace: str, key: str, value: Any, ttl: int | None = None) -> None:
         if not self.enabled:
             return
         ttl = self.default_ttl if ttl is None else ttl

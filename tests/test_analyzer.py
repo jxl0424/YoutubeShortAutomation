@@ -87,7 +87,9 @@ def test_retries_then_succeeds():
 
 
 def test_fallback_when_llm_always_fails():
-    trends = [_agg("c1", "Topic A", popularity=0.8, categories=[ContentCategory.SCIENCE])]
+    trends = [
+        _agg("c1", "Topic A", popularity=0.8, categories=[ContentCategory.SCIENCE])
+    ]
     mock = MockLLMProvider(raise_times=99)
     analyses = TrendAnalyzer(mock, max_retries=1).analyze(trends)
     assert len(analyses) == 1

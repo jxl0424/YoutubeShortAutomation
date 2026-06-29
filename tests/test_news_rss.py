@@ -23,9 +23,7 @@ def _entry(title, link="https://news.example/x", published=None, tags=None):
 
 
 def _feed(entries, bozo=0, bozo_exception=None):
-    return SimpleNamespace(
-        entries=entries, bozo=bozo, bozo_exception=bozo_exception
-    )
+    return SimpleNamespace(entries=entries, bozo=bozo, bozo_exception=bozo_exception)
 
 
 def make(tmp_path, feeds, parser):

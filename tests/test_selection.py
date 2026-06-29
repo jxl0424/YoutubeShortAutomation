@@ -46,7 +46,11 @@ def test_empty_raises():
 
 
 def test_selects_highest_score():
-    ranked = [_ranked("a", "Low", 0.5), _ranked("b", "High", 0.9), _ranked("c", "Mid", 0.3)]
+    ranked = [
+        _ranked("a", "Low", 0.5),
+        _ranked("b", "High", 0.9),
+        _ranked("c", "Mid", 0.3),
+    ]
     topic = TopicSelector().select(ranked)
     assert topic.ranked_trend.aggregated_trend.cluster_id == "b"
     assert topic.manual_override is False

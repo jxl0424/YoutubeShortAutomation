@@ -74,9 +74,7 @@ class TrendCache(ABC):
         """Return the cached value, or ``None`` on miss/expiry."""
 
     @abstractmethod
-    def set(
-        self, namespace: str, key: str, value: Any, ttl: int | None = None
-    ) -> None:
+    def set(self, namespace: str, key: str, value: Any, ttl: int | None = None) -> None:
         """Store a JSON-serializable value with an optional TTL (seconds)."""
 
     @abstractmethod

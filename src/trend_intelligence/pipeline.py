@@ -68,9 +68,7 @@ class TrendIntelligencePipeline:
             analyses = self._analyzer.analyze(aggregated)
             ranked = self._scoring.rank(aggregated, analyses)
             topic = self._selector.select(ranked, override_title=override_title)
-        self._logger.info(
-            "pipeline_selected", title=topic.title, score=topic.score
-        )
+        self._logger.info("pipeline_selected", title=topic.title, score=topic.score)
         return topic
 
     def _discover(self, query: TrendQuery) -> list[TrendProviderResult]:

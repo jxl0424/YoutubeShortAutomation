@@ -74,7 +74,8 @@ def test_run_end_to_end_returns_selected_topic():
     providers = [
         FakeProvider(TrendSource.NEWS_RSS, [_trend("Mars rover landing", pop=0.8)]),
         FakeProvider(
-            TrendSource.GOOGLE_TRENDS, [_trend("Bitcoin surge", TrendSource.GOOGLE_TRENDS, 0.4)]
+            TrendSource.GOOGLE_TRENDS,
+            [_trend("Bitcoin surge", TrendSource.GOOGLE_TRENDS, 0.4)],
         ),
     ]
     topic = _pipeline(providers).run(TrendQuery())

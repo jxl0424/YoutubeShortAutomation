@@ -76,7 +76,7 @@ class GoogleTrendsProvider(BaseTrendProvider):
         max_traffic = max(traffics, default=0)
 
         trends: list[Trend] = []
-        for entry, traffic in zip(raw, traffics):
+        for entry, traffic in zip(raw, traffics, strict=True):
             title = _entry_get(entry, "title")
             if not title or not str(title).strip():
                 continue

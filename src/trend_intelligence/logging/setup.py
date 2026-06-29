@@ -53,9 +53,7 @@ def get_logger(name: str | None = None) -> Any:
 
 
 @contextmanager
-def log_duration(
-    logger: Any, event: str, **fields: Any
-) -> Iterator[dict[str, Any]]:
+def log_duration(logger: Any, event: str, **fields: Any) -> Iterator[dict[str, Any]]:
     """Log the wall-clock duration of a block under ``event``.
 
     Yields a mutable dict; values added to it are merged into the final log

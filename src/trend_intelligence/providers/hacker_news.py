@@ -72,9 +72,7 @@ class HackerNewsProvider(BaseTrendProvider):
             raise ConnectionError(f"all {failures} Hacker News item fetch(es) failed")
         return stories
 
-    def _normalize(
-        self, raw: list[dict[str, Any]], query: TrendQuery
-    ) -> list[Trend]:
+    def _normalize(self, raw: list[dict[str, Any]], query: TrendQuery) -> list[Trend]:
         if not raw:
             return []
         max_score = max((s.get("score", 0) for s in raw), default=0) or 1

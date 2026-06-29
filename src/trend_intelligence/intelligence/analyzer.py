@@ -24,9 +24,7 @@ class TrendAnalyzer:
         self._max_retries = max_retries
         self._logger = get_logger("intelligence")
 
-    def analyze(
-        self, trends: Sequence[AggregatedTrend]
-    ) -> list[TrendAnalysis]:
+    def analyze(self, trends: Sequence[AggregatedTrend]) -> list[TrendAnalysis]:
         if not trends:
             return []
 
@@ -59,9 +57,7 @@ class TrendAnalyzer:
         return kept
 
     # --- internals ------------------------------------------------------- #
-    def _call_with_retry(
-        self, system: str, user: str
-    ) -> TrendAnalysisBatch | None:
+    def _call_with_retry(self, system: str, user: str) -> TrendAnalysisBatch | None:
         last_error: Exception | None = None
         for attempt in range(self._max_retries + 1):
             try:
@@ -81,9 +77,7 @@ class TrendAnalyzer:
         self._logger.error("llm_failed", error=str(last_error))
         return None
 
-    def _fallback(
-        self, trends: Sequence[AggregatedTrend]
-    ) -> list[TrendAnalysis]:
+    def _fallback(self, trends: Sequence[AggregatedTrend]) -> list[TrendAnalysis]:
         """Heuristic analyses used when the LLM is unavailable/invalid."""
         self._logger.warning("llm_fallback", count=len(trends))
         return [

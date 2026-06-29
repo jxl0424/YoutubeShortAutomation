@@ -22,7 +22,9 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         prog="trend-discovery",
         description="Discover, rank and select a YouTube Shorts topic.",
     )
-    parser.add_argument("--config", help="Path to a config YAML (default: config/default.yaml)")
+    parser.add_argument(
+        "--config", help="Path to a config YAML (default: config/default.yaml)"
+    )
     parser.add_argument("--region", help="Override region (e.g. US)")
     parser.add_argument("--language", help="Override language (e.g. en)")
     parser.add_argument("--max", type=int, help="Max trends per provider")

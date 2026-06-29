@@ -26,11 +26,10 @@ trend-discovery = "trend_intelligence.cli:main"
 dev = [
     "pytest>=8.0",
     "pytest-cov>=5.0",
-    "respx>=0.21",
+    "ruff>=0.6",
 ]
-# Enabled in later steps once credentials are supplied:
+# Reddit provider (implemented later) uses praw; YouTube uses httpx (core dep).
 reddit = ["praw>=7.7"]
-youtube = ["google-api-python-client>=2.0"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -39,3 +38,18 @@ where = ["src"]
 testpaths = ["tests"]
 pythonpath = ["src"]
 addopts = "-q"
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP", "B"]
+ignore = [
+    "E501",   # line length is handled by the formatter; don't flag long strings
+    "UP042",  # keep (str, Enum); StrEnum changes str() semantics we rely on via .value
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["trend_intelligence"]

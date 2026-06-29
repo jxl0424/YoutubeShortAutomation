@@ -1,5 +1,7 @@
 # Trend Discovery & Intelligence Layer (Stage 1)
 
+[![CI](https://github.com/jxl0424/YoutubeShortAutomation/actions/workflows/ci.yml/badge.svg)](https://github.com/jxl0424/YoutubeShortAutomation/actions/workflows/ci.yml)
+
 Stage 1 of a YouTube Shorts automation pipeline. It automatically **discovers,
 aggregates, analyzes, scores, and selects** a high-potential Shorts topic before
 any content is generated. Built on Clean Architecture + SOLID so new trend
@@ -55,11 +57,15 @@ python -m trend_intelligence.cli --mock-llm
 Each enabled provider is queried concurrently; a failing provider is logged and
 skipped, so a single outage never breaks a run.
 
-## Run tests
+## Run tests & lint
 
 ```bash
-pytest
+pytest                 # 114 tests, all external APIs mocked
+ruff check .           # lint
+ruff format .          # auto-format
 ```
+
+CI (GitHub Actions) runs lint + format check + tests on every push and PR.
 
 ## Enabling YouTube
 

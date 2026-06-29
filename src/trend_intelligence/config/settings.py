@@ -130,7 +130,7 @@ class AppConfig(BaseModel):
         path: str | Path | None = None,
         *,
         load_env: bool = True,
-    ) -> "AppConfig":
+    ) -> AppConfig:
         """Load configuration from YAML and resolve secrets from the environment."""
         if load_env:
             load_dotenv()
@@ -167,6 +167,4 @@ class AppConfig(BaseModel):
 
     # --- helpers --------------------------------------------------------- #
     def enabled_providers(self) -> dict[str, ProviderConfig]:
-        return {
-            name: cfg for name, cfg in self.providers.items() if cfg.enabled
-        }
+        return {name: cfg for name, cfg in self.providers.items() if cfg.enabled}

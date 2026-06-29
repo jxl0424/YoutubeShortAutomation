@@ -16,9 +16,7 @@ from ..logging.setup import get_logger
 
 
 class ScoringEngine:
-    def __init__(
-        self, strategy: ScoringStrategy, weights: Mapping[str, float]
-    ) -> None:
+    def __init__(self, strategy: ScoringStrategy, weights: Mapping[str, float]) -> None:
         self._strategy = strategy
         self._weights = dict(weights)
         self._logger = get_logger("scoring")

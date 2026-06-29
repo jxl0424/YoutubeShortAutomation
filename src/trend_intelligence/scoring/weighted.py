@@ -9,7 +9,7 @@ The whole strategy is replaceable via the :class:`ScoringStrategy` interface.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from ..domain.interfaces import ScoringStrategy
 from ..domain.models import (
@@ -28,7 +28,7 @@ def _clamp(value: float) -> float:
 
 
 def _recency(timestamp: datetime, window_hours: float = _RECENCY_WINDOW_HOURS) -> float:
-    age_hours = (datetime.now(timezone.utc) - timestamp).total_seconds() / 3600
+    age_hours = (datetime.now(UTC) - timestamp).total_seconds() / 3600
     return _clamp(1.0 - age_hours / window_hours)
 
 
@@ -62,9 +62,7 @@ class WeightedScoringStrategy(ScoringStrategy):
         educational = analysis.educational_value if analysis else 0.5
         entertainment = analysis.entertainment_value if analysis else 0.5
         interest = (
-            analysis.estimated_audience_interest
-            if analysis
-            else trend.popularity_score
+            analysis.estimated_audience_interest if analysis else trend.popularity_score
         )
 
         is_news = (

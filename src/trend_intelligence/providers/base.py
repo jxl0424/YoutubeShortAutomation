@@ -26,14 +26,40 @@ from tenacity import (
 from ..config.settings import HttpConfig, ProviderConfig
 from ..domain.exceptions import RateLimitError
 from ..domain.interfaces import TrendCache, TrendProvider
-from ..domain.models import Trend, TrendProviderResult, TrendQuery, TrendSource
+from ..domain.models import Trend, TrendProviderResult, TrendQuery
 from ..logging.setup import get_logger
 
 _WORD_RE = re.compile(r"[A-Za-z0-9']+")
 _STOPWORDS = {
-    "the", "a", "an", "and", "or", "of", "to", "in", "on", "for", "with",
-    "is", "are", "was", "were", "be", "by", "at", "as", "it", "this", "that",
-    "from", "how", "why", "what", "new", "your", "you",
+    "the",
+    "a",
+    "an",
+    "and",
+    "or",
+    "of",
+    "to",
+    "in",
+    "on",
+    "for",
+    "with",
+    "is",
+    "are",
+    "was",
+    "were",
+    "be",
+    "by",
+    "at",
+    "as",
+    "it",
+    "this",
+    "that",
+    "from",
+    "how",
+    "why",
+    "what",
+    "new",
+    "your",
+    "you",
 }
 
 
@@ -194,9 +220,7 @@ class BaseTrendProvider(TrendProvider):
             error=str(retry_state.outcome.exception()),
         )
 
-    def _postprocess(
-        self, trends: list[Trend], query: TrendQuery
-    ) -> list[Trend]:
+    def _postprocess(self, trends: list[Trend], query: TrendQuery) -> list[Trend]:
         """De-duplicate within the provider, sort by popularity, truncate."""
         unique: dict[str, Trend] = {}
         for trend in trends:

@@ -78,9 +78,7 @@ class YouTubeProvider(BaseTrendProvider):
             raise ConnectionError(str(exc)) from exc
         return data.get("items", []) if isinstance(data, dict) else []
 
-    def _normalize(
-        self, raw: list[dict[str, Any]], query: TrendQuery
-    ) -> list[Trend]:
+    def _normalize(self, raw: list[dict[str, Any]], query: TrendQuery) -> list[Trend]:
         if not raw:
             return []
         views = [_to_int(it.get("statistics", {}), "viewCount") for it in raw]
@@ -93,7 +91,7 @@ class YouTubeProvider(BaseTrendProvider):
         max_engagement = max(engagements, default=0) or 1
 
         trends: list[Trend] = []
-        for item, view_count, engagement in zip(raw, views, engagements):
+        for item, view_count, engagement in zip(raw, views, engagements, strict=True):
             snippet = item.get("snippet", {})
             title = str(snippet.get("title", "")).strip()
             if not title:

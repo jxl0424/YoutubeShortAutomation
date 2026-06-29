@@ -8,7 +8,7 @@ native popularity signal); the LLM stage refines category/quality later.
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import feedparser
@@ -32,10 +32,10 @@ def _freshness(published_parsed: Any) -> float:
     if not published_parsed:
         return 0.4  # unknown publish time → mild signal
     try:
-        published = datetime(*published_parsed[:6], tzinfo=timezone.utc)
+        published = datetime(*published_parsed[:6], tzinfo=UTC)
     except (TypeError, ValueError):
         return 0.4
-    age_hours = (datetime.now(timezone.utc) - published).total_seconds() / 3600
+    age_hours = (datetime.now(UTC) - published).total_seconds() / 3600
     return max(0.0, min(1.0, 1.0 - age_hours / _FRESHNESS_WINDOW_HOURS))
 
 
@@ -82,9 +82,7 @@ class NewsRSSProvider(BaseTrendProvider):
             raise ConnectionError(f"all {failures} RSS feed(s) failed")
         return raw_entries
 
-    def _normalize(
-        self, raw: list[dict[str, Any]], query: TrendQuery
-    ) -> list[Trend]:
+    def _normalize(self, raw: list[dict[str, Any]], query: TrendQuery) -> list[Trend]:
         trends: list[Trend] = []
         for item in raw:
             entry, feed = item["entry"], item["feed"]

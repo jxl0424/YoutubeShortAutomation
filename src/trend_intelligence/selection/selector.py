@@ -84,9 +84,7 @@ class TopicSelector(SelectionStrategy):
             alternatives,
             manual_override=True,
         )
-        self._logger.info(
-            "topic_selected", title=topic.title, manual_override=True
-        )
+        self._logger.info("topic_selected", title=topic.title, manual_override=True)
         return topic
 
     def _eligible(self, ranked: Sequence[RankedTrend]) -> list[RankedTrend]:
@@ -113,9 +111,7 @@ class TopicSelector(SelectionStrategy):
         return item.final_score + self._config.evergreen_bonus * educational
 
     @staticmethod
-    def _find_by_title(
-        ranked: Sequence[RankedTrend], title: str
-    ) -> RankedTrend | None:
+    def _find_by_title(ranked: Sequence[RankedTrend], title: str) -> RankedTrend | None:
         needle = title.strip().lower()
         # Exact match on canonical or refined title first, then substring.
         for item in ranked:

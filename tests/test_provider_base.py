@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from trend_intelligence.config.settings import HttpConfig, ProviderConfig
 from trend_intelligence.domain.exceptions import InvalidResponseError
 from trend_intelligence.domain.models import Trend, TrendQuery, TrendSource
@@ -29,9 +27,7 @@ class DummyProvider(BaseTrendProvider):
         return self._raw
 
     def _normalize(self, raw, query):
-        return [
-            Trend(title=t, source=self.source, popularity_score=0.5) for t in raw
-        ]
+        return [Trend(title=t, source=self.source, popularity_score=0.5) for t in raw]
 
 
 def make(cache, *, enabled=True, max_trends=10, max_retries=3, **kw):
@@ -112,9 +108,7 @@ def test_disabled_provider_returns_failure(tmp_path):
 def test_rate_limiter_enforces_interval():
     slept: list[float] = []
     clock = [0.0]
-    limiter = RateLimiter(
-        5.0, clock=lambda: clock[0], sleep=lambda s: slept.append(s)
-    )
+    limiter = RateLimiter(5.0, clock=lambda: clock[0], sleep=lambda s: slept.append(s))
     limiter.acquire()  # first call: no wait
     clock[0] = 2.0
     limiter.acquire()  # 2s elapsed, need 5 → sleep 3

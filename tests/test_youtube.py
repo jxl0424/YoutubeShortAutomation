@@ -43,7 +43,9 @@ def make(tmp_path, fetch=None, *, enabled=True, api_key="k", max_trends=20):
         options={"region_code": "US"},
     )
     return YouTubeProvider(
-        config, LocalFileCache(tmp_path), http=HttpConfig(backoff_factor=0.0),
+        config,
+        LocalFileCache(tmp_path),
+        http=HttpConfig(backoff_factor=0.0),
         fetch_json=fetch,
     )
 

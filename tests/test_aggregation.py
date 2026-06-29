@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -71,9 +71,7 @@ def test_canonical_is_highest_popularity_member():
 def test_cross_source_popularity_bonus():
     trends = [
         _trend("Quantum chip breakthrough", source=TrendSource.NEWS_RSS, pop=0.5),
-        _trend(
-            "Quantum chip breakthrough", source=TrendSource.GOOGLE_TRENDS, pop=0.5
-        ),
+        _trend("Quantum chip breakthrough", source=TrendSource.GOOGLE_TRENDS, pop=0.5),
     ]
     agg = _agg(cross_source_bonus=0.08).aggregate_trends(trends)[0]
     # mean 0.5 + 0.08 * (2 - 1) = 0.58
@@ -82,10 +80,16 @@ def test_cross_source_popularity_bonus():
 
 def test_keywords_and_categories_merged():
     trends = [
-        _trend("Solar flare alert", keywords=["solar", "flare"],
-               category=ContentCategory.SCIENCE),
-        _trend("Solar flare alert", keywords=["flare", "aurora"],
-               category=ContentCategory.NEWS),
+        _trend(
+            "Solar flare alert",
+            keywords=["solar", "flare"],
+            category=ContentCategory.SCIENCE,
+        ),
+        _trend(
+            "Solar flare alert",
+            keywords=["flare", "aurora"],
+            category=ContentCategory.NEWS,
+        ),
     ]
     agg = _agg().aggregate_trends(trends)[0]
     assert agg.keywords == ["solar", "flare", "aurora"]
@@ -93,7 +97,7 @@ def test_keywords_and_categories_merged():
 
 
 def test_first_and_last_seen_span_members():
-    t0 = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    t0 = datetime(2026, 1, 1, tzinfo=UTC)
     trends = [
         _trend("Eclipse tonight", discovered_at=t0),
         _trend("Eclipse tonight", discovered_at=t0 + timedelta(hours=5)),
@@ -111,8 +115,14 @@ def test_cluster_id_is_deterministic():
 
 def test_max_aggregated_truncates_strongest_first():
     titles = [
-        "Bitcoin rally", "Mars mission", "Pasta recipe", "Quantum computing",
-        "Election results", "Climate report", "Movie premiere", "Football final",
+        "Bitcoin rally",
+        "Mars mission",
+        "Pasta recipe",
+        "Quantum computing",
+        "Election results",
+        "Climate report",
+        "Movie premiere",
+        "Football final",
     ]
     trends = [_trend(t, pop=i / 10) for i, t in enumerate(titles)]
     result = _agg(max_aggregated=3).aggregate_trends(trends)

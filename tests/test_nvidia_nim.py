@@ -28,9 +28,7 @@ class FakeClient:
         self._content = content
         self._exc = exc
         self.last_kwargs = None
-        self.chat = SimpleNamespace(
-            completions=SimpleNamespace(create=self._create)
-        )
+        self.chat = SimpleNamespace(completions=SimpleNamespace(create=self._create))
 
     def _create(self, **kwargs):
         self.last_kwargs = kwargs

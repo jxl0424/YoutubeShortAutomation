@@ -30,7 +30,10 @@ def _feed(entries, bozo=0):
 def make(tmp_path, parser, *, max_trends=20, geo="US"):
     config = ProviderConfig(enabled=True, max_trends=max_trends, options={"geo": geo})
     return GoogleTrendsProvider(
-        config, LocalFileCache(tmp_path), http=HttpConfig(backoff_factor=0.0), parser=parser
+        config,
+        LocalFileCache(tmp_path),
+        http=HttpConfig(backoff_factor=0.0),
+        parser=parser,
     )
 
 

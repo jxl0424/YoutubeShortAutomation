@@ -18,7 +18,6 @@ from __future__ import annotations
 import hashlib
 import re
 from collections.abc import Iterable, Sequence
-from datetime import datetime
 
 from ..domain.models import (
     AggregatedTrend,
@@ -31,9 +30,37 @@ from ..logging.setup import get_logger
 
 _WORD_RE = re.compile(r"[A-Za-z0-9']+")
 _STOPWORDS = {
-    "the", "a", "an", "and", "or", "of", "to", "in", "on", "for", "with",
-    "is", "are", "was", "were", "be", "by", "at", "as", "it", "this", "that",
-    "from", "how", "why", "what", "new", "your", "you", "his", "her",
+    "the",
+    "a",
+    "an",
+    "and",
+    "or",
+    "of",
+    "to",
+    "in",
+    "on",
+    "for",
+    "with",
+    "is",
+    "are",
+    "was",
+    "were",
+    "be",
+    "by",
+    "at",
+    "as",
+    "it",
+    "this",
+    "that",
+    "from",
+    "how",
+    "why",
+    "what",
+    "new",
+    "your",
+    "you",
+    "his",
+    "her",
 }
 
 

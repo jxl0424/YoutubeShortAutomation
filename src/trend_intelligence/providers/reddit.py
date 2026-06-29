@@ -22,9 +22,7 @@ class RedditProvider(BaseTrendProvider):
     def is_enabled(self) -> bool:
         if not self._config.enabled:
             return False
-        client_id_env = self._config.options.get(
-            "client_id_env", "REDDIT_CLIENT_ID"
-        )
+        client_id_env = self._config.options.get("client_id_env", "REDDIT_CLIENT_ID")
         return bool(os.getenv(client_id_env) and self._config.api_key)
 
     def _fetch_raw(self, query: TrendQuery) -> Any:
