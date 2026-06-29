@@ -2,6 +2,7 @@
 
 from .llm import FallbackLLM, OpenAICompatibleLLM, build_script_llm
 from .render import MoviePyRenderer, build_renderer
+from .thumbnail import PillowThumbnailRenderer, build_thumbnail_renderer
 from .visual import (
     PexelsVisualProvider,
     PollinationsVisualProvider,
@@ -17,4 +18,6 @@ __all__ = [
     "build_visual_providers",
     "MoviePyRenderer",
     "build_renderer",
+    "PillowThumbnailRenderer",
+    "build_thumbnail_renderer",
 ]

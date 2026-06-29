@@ -20,6 +20,8 @@ from .models import (
     RenderedVideo,
     RenderRequest,
     Scene,
+    ThumbnailRequest,
+    ThumbnailResult,
     UploadResult,
     VideoMetadata,
     VisualAsset,
@@ -36,6 +38,7 @@ __all__ = [
     "VoiceProvider",
     "VisualProvider",
     "VideoRenderer",
+    "ThumbnailRenderer",
     "StorageProvider",
     "UploadProvider",
     "PipelineStage",
@@ -84,6 +87,17 @@ class VideoRenderer(ABC):
     @abstractmethod
     def render(self, request: RenderRequest) -> RenderedVideo:
         """Render the request to a video file and return its metadata."""
+
+
+class ThumbnailRenderer(ABC):
+    """Renders the thumbnail image. Default is Pillow; new templates implement
+    this without changing the thumbnail stage."""
+
+    name: ClassVar[str]
+
+    @abstractmethod
+    def render(self, request: ThumbnailRequest) -> ThumbnailResult:
+        """Render the thumbnail to an image file and return its metadata."""
 
 
 class StorageProvider(ABC):

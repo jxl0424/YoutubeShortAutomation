@@ -181,6 +181,16 @@ class RenderedVideo(_Model):
     bitrate: str | None = None
 
 
+class ThumbnailRequest(_Model):
+    output_path: Path
+    width: int = Field(gt=0)
+    height: int = Field(gt=0)
+    title: str
+    background_path: Path | None = None
+    branding: str | None = None
+    title_overlay: bool = True
+
+
 class ThumbnailResult(_Model):
     path: Path
     width: int = Field(gt=0)
