@@ -176,7 +176,7 @@ def build_pipeline(
         MetadataGenerator(llm),
         VoiceGenerator(voice),
         VisualPlanner(),
-        AssetCollector(visuals),
+        AssetCollector(visuals, max_retries=2, backoff_factor=2.0),
         AssetValidator(),
         VideoAssembler(video_renderer),
         ThumbnailGenerator(thumb_renderer),

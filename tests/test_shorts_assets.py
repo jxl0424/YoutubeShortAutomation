@@ -85,6 +85,36 @@ def test_raises_when_all_providers_fail(tmp_path):
         AssetCollector([FakeProvider("a", VisualType.STOCK_VIDEO, fail=True)]).run(ctx)
 
 
+class FlakyProvider(VisualProvider):
+    def __init__(self, name, vtype, fail_times):
+        self.name = name
+        self.provides = {vtype}
+        self._vtype = vtype
+        self._fail_times = fail_times
+        self.calls = 0
+
+    def fetch(self, scene, output_dir):
+        self.calls += 1
+        if self.calls <= self._fail_times:
+            raise VisualError("flaky")
+        return VisualAsset(
+            scene_index=scene.index,
+            visual_type=self._vtype,
+            path=Path(f"{self.name}.bin"),
+            source=self.name,
+        )
+
+
+def test_retries_same_provider_before_failing(tmp_path):
+    flaky = FlakyProvider("poll", VisualType.GENERATED_IMAGE, fail_times=1)
+    ctx = _Ctx([_scene(0, VisualType.GENERATED_IMAGE)], tmp_path)
+    AssetCollector(
+        [flaky], max_retries=2, backoff_factor=0.0, sleep=lambda s: None
+    ).run(ctx)
+    assert flaky.calls == 2  # failed once, retried, then succeeded
+    assert len(ctx.assets) == 1
+
+
 # --- Pollinations ---------------------------------------------------------- #
 def test_pollinations_writes_image(tmp_path):
     provider = PollinationsVisualProvider(download=lambda url: b"\xff\xd8imagebytes")

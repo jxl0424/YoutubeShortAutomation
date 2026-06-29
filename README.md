@@ -26,6 +26,42 @@ Trend Sources → Discovery → Aggregation → Intelligence (LLM) → Scoring �
 
 **Stage 1 is complete** — discovery → aggregation → intelligence → scoring → selection runs end-to-end.
 
+## Stage 2 — AI Shorts Generation
+
+Stage 2 (package `shorts`) turns a Stage 1 `SelectedTopic` into a fully rendered,
+upload-ready YouTube Short. It reuses Stage 1's architecture, logging, and
+`LLMProvider` interface, and depends only on a `TopicBrief` adapter — never on
+Stage 1 internals.
+
+```text
+SelectedTopic → script → metadata → voice → visual planning → asset collection
+→ validation → assembly → thumbnail → packaging → [upload]  →  output/<slug>/
+```
+
+Each stage is an independent, replaceable `PipelineStage`; external services sit
+behind provider interfaces (LLM, voice, visual, renderer, thumbnail, storage,
+upload) selected by config. **All Stage-2 stages are complete and verified with a
+full live run** (NVIDIA NIM → edge-tts → Pollinations → MoviePy/FFmpeg → Pillow).
+
+| Provider | Default | Credentials |
+|----------|---------|-------------|
+| Script / Metadata (LLM) | Gemini Flash (fallback Groq/OpenRouter) | `GEMINI_API_KEY` (or set `script.provider: nvidia_nim` to reuse `NVIDIA_API_KEY`) |
+| Voice | edge-tts | none |
+| Visuals | Pollinations (image gen) + Pexels (stock video) | Pollinations none; Pexels `PEXELS_API_KEY` |
+| Render | MoviePy + bundled FFmpeg | none (imageio-ffmpeg) |
+| Upload | YouTube Data API v3 (off by default) | `YOUTUBE_CLIENT_SECRETS` + `pip install -e ".[youtube]"` |
+
+```python
+from trend_intelligence.domain.models import SelectedTopic   # from Stage 1
+from shorts import ShortsConfig, build_pipeline
+
+pipeline = build_pipeline(ShortsConfig.load())
+package = pipeline.generate(selected_topic)   # -> output/<slug>/ with video.mp4, etc.
+```
+
+Output folder: `video.mp4`, `thumbnail.png`, `captions.srt`, `metadata.json`,
+`description.txt`, `tags.txt`, `script.txt`, `assets/`, `logs/`.
+
 ## Setup
 
 ```bash

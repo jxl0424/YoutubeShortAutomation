@@ -141,7 +141,7 @@ class UploadConfig(_Section):
 
 
 class HttpConfig(_Section):
-    timeout_seconds: float = Field(default=30.0, gt=0)
+    timeout_seconds: float = Field(default=60.0, gt=0)
     max_retries: int = Field(default=3, ge=0)
     backoff_factor: float = Field(default=0.5, ge=0.0)
     backoff_max_seconds: float = Field(default=30.0, gt=0)

@@ -21,8 +21,20 @@ from ..domain.models import Scene, VisualAsset
 class AssetCollector(PipelineStage):
     name = "asset_collection"
 
-    def __init__(self, providers: Sequence[VisualProvider]) -> None:
+    def __init__(
+        self,
+        providers: Sequence[VisualProvider],
+        *,
+        max_retries: int = 0,
+        backoff_factor: float = 1.0,
+        sleep=None,
+    ) -> None:
+        import time
+
         self._providers = list(providers)
+        self._max_retries = max_retries
+        self._backoff_factor = backoff_factor
+        self._sleep = sleep or time.sleep
         self._logger = get_logger("shorts.assets")
 
     def run(self, ctx) -> None:
@@ -48,21 +60,25 @@ class AssetCollector(PipelineStage):
         )
         last_error: Exception | None = None
         for provider in ordered:
-            try:
-                asset = provider.fetch(scene, output_dir)
-                self._logger.info(
-                    "asset_fetched",
-                    scene=scene.index,
-                    provider=provider.name,
-                    type=asset.visual_type.value,
-                )
-                return asset
-            except Exception as exc:
-                last_error = exc
-                self._logger.warning(
-                    "asset_provider_failed",
-                    scene=scene.index,
-                    provider=provider.name,
-                    error=str(exc),
-                )
+            for attempt in range(self._max_retries + 1):
+                try:
+                    asset = provider.fetch(scene, output_dir)
+                    self._logger.info(
+                        "asset_fetched",
+                        scene=scene.index,
+                        provider=provider.name,
+                        type=asset.visual_type.value,
+                    )
+                    return asset
+                except Exception as exc:
+                    last_error = exc
+                    self._logger.warning(
+                        "asset_provider_failed",
+                        scene=scene.index,
+                        provider=provider.name,
+                        attempt=attempt + 1,
+                        error=str(exc),
+                    )
+                    if attempt < self._max_retries:
+                        self._sleep(self._backoff_factor * (2**attempt))
         raise VisualError(f"no provider could supply scene {scene.index}: {last_error}")
