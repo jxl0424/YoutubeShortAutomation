@@ -1,0 +1,110 @@
+# Trend Intelligence — runtime configuration.
+# Everything here is configurable without code changes. Secrets are NOT stored
+# here; they are read from environment variables named by the `*_env` keys.
+
+region: US
+language: en
+max_trends_per_provider: 20
+categories: []   # empty = all categories
+
+providers:
+  news_rss:
+    enabled: true
+    max_trends: 25
+    timeout_seconds: 10
+    max_retries: 3
+    options:
+      feeds:
+        - https://feeds.bbci.co.uk/news/rss.xml
+        - https://feeds.npr.org/1001/rss.xml
+        - https://feeds.feedburner.com/TechCrunch/
+        - https://www.theverge.com/rss/index.xml
+
+  google_trends:
+    enabled: true
+    max_trends: 20
+    timeout_seconds: 15
+    max_retries: 3
+    options:
+      geo: US               # Trending Now RSS region (ISO country code)
+
+  hacker_news:
+    enabled: true
+    max_trends: 25
+    timeout_seconds: 10
+    max_retries: 3
+
+  reddit:
+    enabled: false          # enable once REDDIT_CLIENT_ID/SECRET are set
+    max_trends: 25
+    timeout_seconds: 10
+    max_retries: 3
+    api_key_env: REDDIT_CLIENT_SECRET
+    options:
+      client_id_env: REDDIT_CLIENT_ID
+      user_agent: youtube-shorts-trend-bot/0.1
+      subreddits:
+        - all
+        - popular
+
+  youtube:
+    enabled: true           # dormant until YOUTUBE_API_KEY is set in .env, then auto-activates
+    max_trends: 25
+    timeout_seconds: 10
+    max_retries: 3
+    api_key_env: YOUTUBE_API_KEY
+    options:
+      region_code: US
+
+cache:
+  backend: local
+  directory: .cache/trends
+  default_ttl_seconds: 3600
+  enabled: true
+  ttl_overrides:
+    aggregated: 1800
+
+llm:
+  provider: nvidia_nim
+  base_url: https://integrate.api.nvidia.com/v1
+  model: meta/llama-3.1-70b-instruct
+  api_key_env: NVIDIA_API_KEY
+  temperature: 0.4
+  max_tokens: 2048
+  timeout_seconds: 60
+  max_retries: 3
+
+# Scoring weights — should sum to ~1.0. Algorithm is replaceable; these feed the
+# default weighted strategy (implemented in Step 5).
+scoring:
+  search_popularity: 0.11
+  growth_rate: 0.09       # lowered: news RSS no longer claims growth from recency
+  recent_activity: 0.06
+  engagement: 0.12        # raised: rewards Hacker News comment volume
+  competition: 0.06
+  freshness: 0.05
+  news_relevance: 0.04    # lowered: less pure-news bias
+  uniqueness: 0.06
+  visual_potential: 0.08
+  educational_value: 0.06
+  entertainment_value: 0.07
+  estimated_virality: 0.10
+  ai_confidence: 0.10
+
+selection:
+  min_score: 0.0
+  require_monetization_safe: true
+  max_alternatives: 5
+  evergreen_bonus: 0.0
+
+http:
+  timeout_seconds: 10
+  max_retries: 3
+  backoff_factor: 0.5
+  backoff_max_seconds: 30
+
+aggregation:
+  similarity_threshold: 0.6   # token similarity required to cluster two titles
+  cross_source_bonus: 0.08    # popularity boost per extra corroborating source
+  max_aggregated: 50          # cap on aggregated trends returned (strongest first)
+  min_token_length: 3
