@@ -1,0 +1,94 @@
+# Stage 2 — Shorts generation configuration.
+# Everything is configurable here; secrets are read from env vars named by the
+# *_env keys (never stored in YAML). Defaults are runnable without paid keys.
+
+language: en
+
+enrichment:
+  enabled: false        # optional lightweight research before script generation
+  max_facts: 5
+
+script:
+  provider: gemini_flash
+  fallback_providers: [groq, openrouter]
+  model: gemini-2.0-flash
+  temperature: 0.7
+  max_tokens: 1024
+  min_words: 60
+  max_words: 90
+  include_cta: true
+  api_key_env: GEMINI_API_KEY
+
+metadata:
+  max_title_length: 100
+  max_tags: 15
+  hashtag_count: 5
+
+voice:
+  provider: edge_tts    # credential-free
+  voice: en-US-AriaNeural
+  language: en
+  rate: "+0%"
+  pitch: "+0Hz"
+
+visual_planning:
+  words_per_second: 2.5
+  min_scene_seconds: 2.0
+  max_scene_seconds: 6.0
+  default_visual_type: stock_video
+
+assets:
+  providers: [pexels, pollinations]
+  stock:
+    pexels_api_key_env: PEXELS_API_KEY
+    pixabay_api_key_env: PIXABAY_API_KEY
+  generated:
+    provider: pollinations    # credential-free image generation
+    api_key_env: null
+
+validation:
+  min_width: 720
+  min_height: 1280
+  target_aspect_ratio: "9:16"
+  allow_duplicates: false
+
+video:
+  width: 1080
+  height: 1920
+  fps: 30
+  bitrate: 8M
+  ken_burns: true
+  transitions: true
+  template: default
+  subtitles:
+    enabled: true
+    font: Arial
+    font_size: 48
+    color: white
+    position: bottom
+  music:
+    enabled: false
+    path: null
+    volume: 0.15
+
+thumbnail:
+  enabled: true
+  template: default
+  title_overlay: true
+  branding: null
+
+packaging:
+  output_dir: output
+
+upload:
+  enabled: false        # pipeline runs fully even with uploads disabled
+  privacy: private
+  category_id: "22"
+  client_secrets_env: YOUTUBE_CLIENT_SECRETS
+  token_path: .secrets/youtube_token.json
+
+http:
+  timeout_seconds: 30
+  max_retries: 3
+  backoff_factor: 0.5
+  backoff_max_seconds: 30

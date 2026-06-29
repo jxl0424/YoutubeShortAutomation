@@ -52,4 +52,4 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["trend_intelligence"]
+known-first-party = ["trend_intelligence", "shorts"]
