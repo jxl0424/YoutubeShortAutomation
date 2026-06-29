@@ -3,6 +3,7 @@
 from .assembly import VideoAssembler
 from .assets import AssetCollector
 from .metadata import MetadataGenerator
+from .packaging import Packager
 from .script import ScriptGenerator
 from .thumbnail import ThumbnailGenerator
 from .validation import AssetValidator
@@ -13,6 +14,7 @@ __all__ = [
     "AssetCollector",
     "AssetValidator",
     "MetadataGenerator",
+    "Packager",
     "ScriptGenerator",
     "ThumbnailGenerator",
     "VideoAssembler",

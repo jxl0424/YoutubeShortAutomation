@@ -2,6 +2,7 @@
 
 from .llm import FallbackLLM, OpenAICompatibleLLM, build_script_llm
 from .render import MoviePyRenderer, build_renderer
+from .storage import LocalStorageProvider, build_storage
 from .thumbnail import PillowThumbnailRenderer, build_thumbnail_renderer
 from .visual import (
     PexelsVisualProvider,
@@ -20,4 +21,6 @@ __all__ = [
     "build_renderer",
     "PillowThumbnailRenderer",
     "build_thumbnail_renderer",
+    "LocalStorageProvider",
+    "build_storage",
 ]
