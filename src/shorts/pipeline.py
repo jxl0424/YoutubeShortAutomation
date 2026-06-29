@@ -115,3 +115,72 @@ class ShortsPipeline:
         return (
             Path(self._config.packaging.output_dir) / f"{slug or 'short'}-{timestamp}"
         )
+
+
+def build_pipeline(
+    config: ShortsConfig,
+    *,
+    script_llm=None,
+    voice_provider=None,
+    visual_providers=None,
+    renderer=None,
+    thumbnail_renderer=None,
+    storage=None,
+    upload_provider=None,
+) -> ShortsPipeline:
+    """Wire every stage from configuration (optional injection for testing).
+
+    Stages self-gate where optional: thumbnail and upload skip themselves when
+    disabled, so the pipeline runs end-to-end with uploads off out of the box.
+    (Topic enrichment is optional and not yet implemented; it slots in here.)
+    """
+    from .providers.llm import build_script_llm
+    from .providers.render import build_renderer
+    from .providers.storage import build_storage
+    from .providers.thumbnail import build_thumbnail_renderer
+    from .providers.upload import build_upload_provider
+    from .providers.visual import build_visual_providers
+    from .providers.voice import build_voice_provider
+    from .stages import (
+        AssetCollector,
+        AssetValidator,
+        MetadataGenerator,
+        Packager,
+        ScriptGenerator,
+        ThumbnailGenerator,
+        Uploader,
+        VideoAssembler,
+        VisualPlanner,
+        VoiceGenerator,
+    )
+
+    llm = script_llm or build_script_llm(config.script)
+    voice = voice_provider or build_voice_provider(config.voice)
+    visuals = (
+        visual_providers
+        if visual_providers is not None
+        else build_visual_providers(
+            config.assets,
+            width=config.video.width,
+            height=config.video.height,
+            timeout=config.http.timeout_seconds,
+        )
+    )
+    video_renderer = renderer or build_renderer(config.video)
+    thumb_renderer = thumbnail_renderer or build_thumbnail_renderer(config.thumbnail)
+    file_storage = storage or build_storage(config.packaging)
+    uploader = upload_provider or build_upload_provider(config.upload)
+
+    stages: list[PipelineStage] = [
+        ScriptGenerator(llm),
+        MetadataGenerator(llm),
+        VoiceGenerator(voice),
+        VisualPlanner(),
+        AssetCollector(visuals),
+        AssetValidator(),
+        VideoAssembler(video_renderer),
+        ThumbnailGenerator(thumb_renderer),
+        Packager(file_storage),
+        Uploader(uploader),
+    ]
+    return ShortsPipeline(stages, config)

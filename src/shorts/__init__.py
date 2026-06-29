@@ -8,7 +8,7 @@ __version__ = "0.1.0"
 
 from .config.settings import ShortsConfig
 from .domain.brief import TopicBrief
-from .pipeline import PipelineContext, ShortsPipeline
+from .pipeline import PipelineContext, ShortsPipeline, build_pipeline
 
 __all__ = [
     "__version__",
@@ -16,4 +16,5 @@ __all__ = [
     "TopicBrief",
     "PipelineContext",
     "ShortsPipeline",
+    "build_pipeline",
 ]

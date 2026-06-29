@@ -31,8 +31,10 @@ dev = [
     "pytest-cov>=5.0",
     "ruff>=0.6",
 ]
-# Reddit provider (implemented later) uses praw; YouTube uses httpx (core dep).
+# Reddit trend provider (Stage 1) uses praw; Stage 1 YouTube provider uses httpx.
 reddit = ["praw>=7.7"]
+# Stage 2 YouTube upload (optional; lazy-imported):
+youtube = ["google-api-python-client>=2", "google-auth-oauthlib>=1"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

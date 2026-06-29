@@ -6,6 +6,7 @@ from .metadata import MetadataGenerator
 from .packaging import Packager
 from .script import ScriptGenerator
 from .thumbnail import ThumbnailGenerator
+from .upload import Uploader
 from .validation import AssetValidator
 from .visual_planning import VisualPlanner
 from .voice import VoiceGenerator
@@ -17,6 +18,7 @@ __all__ = [
     "Packager",
     "ScriptGenerator",
     "ThumbnailGenerator",
+    "Uploader",
     "VideoAssembler",
     "VisualPlanner",
     "VoiceGenerator",
