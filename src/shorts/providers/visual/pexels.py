@@ -1,0 +1,113 @@
+"""Pexels visual provider — vertical stock video (requires PEXELS_API_KEY).
+
+    GET https://api.pexels.com/videos/search?query=&orientation=portrait
+
+Picks a portrait video file meeting the minimum height and downloads it. Both
+the search and the download are injectable so tests never hit the network.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Callable
+from pathlib import Path
+from typing import Any, ClassVar
+
+from ...domain.exceptions import VisualError
+from ...domain.interfaces import VisualProvider
+from ...domain.models import Scene, VisualAsset, VisualType
+
+_SEARCH_URL = "https://api.pexels.com/videos/search"
+
+
+class PexelsVisualProvider(VisualProvider):
+    name = "pexels"
+    provides: ClassVar[set[VisualType]] = {VisualType.STOCK_VIDEO}
+
+    def __init__(
+        self,
+        *,
+        api_key: str,
+        min_height: int = 1280,
+        per_page: int = 5,
+        timeout: float = 30.0,
+        search: Callable[[str], dict[str, Any]] | None = None,
+        download: Callable[[str], bytes] | None = None,
+    ) -> None:
+        self._api_key = api_key
+        self._min_height = min_height
+        self._per_page = per_page
+        self._timeout = timeout
+        self._search = search or self._http_search
+        self._download = download or self._http_download
+
+    # --- network (injectable) ------------------------------------------- #
+    def _http_search(self, query: str) -> dict[str, Any]:
+        import httpx
+
+        response = httpx.get(
+            _SEARCH_URL,
+            params={
+                "query": query,
+                "orientation": "portrait",
+                "per_page": self._per_page,
+            },
+            headers={"Authorization": self._api_key},
+            timeout=self._timeout,
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def _http_download(self, url: str) -> bytes:
+        import httpx
+
+        response = httpx.get(url, timeout=self._timeout, follow_redirects=True)
+        response.raise_for_status()
+        return response.content
+
+    # --- selection ------------------------------------------------------- #
+    def _pick(self, data: dict[str, Any]) -> tuple[str, int, int, float | None]:
+        videos = data.get("videos") or []
+        best: tuple[str, int, int, float | None] | None = None
+        best_height = -1
+        for video in videos:
+            duration = video.get("duration")
+            for file in video.get("video_files") or []:
+                width = int(file.get("width") or 0)
+                height = int(file.get("height") or 0)
+                link = file.get("link")
+                if not link:
+                    continue
+                # Prefer portrait files at or above the minimum height.
+                portrait = height >= width and height >= self._min_height
+                if portrait and height > best_height:
+                    best, best_height = (link, width, height, duration), height
+        if best is None:
+            raise VisualError("pexels returned no suitable portrait video")
+        return best
+
+    def fetch(self, scene: Scene, output_dir: Path) -> VisualAsset:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            data = self._search(scene.visual_query)
+            link, width, height, duration = self._pick(data)
+            content = self._download(link)
+        except VisualError:
+            raise
+        except Exception as exc:
+            raise VisualError(f"pexels failed for scene {scene.index}: {exc}") from exc
+        if not content:
+            raise VisualError(f"pexels returned empty video for scene {scene.index}")
+
+        path = output_dir / f"scene_{scene.index:02d}.mp4"
+        path.write_bytes(content)
+        return VisualAsset(
+            scene_index=scene.index,
+            visual_type=VisualType.STOCK_VIDEO,
+            path=path,
+            source=self.name,
+            source_url=link,
+            width=width,
+            height=height,
+            duration_seconds=float(duration) if duration else None,
+            license="Pexels",
+        )
