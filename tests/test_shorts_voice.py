@@ -109,6 +109,8 @@ def test_kokoro_estimates_word_times_span_duration():
 
 
 def test_kokoro_synthesizes_mp3_and_cues(tmp_path):
+    # soundfile ships in the optional [kokoro] extra; skip if it isn't installed.
+    pytest.importorskip("soundfile")
     import numpy as np
 
     def fake_synth(text, voice, speed, lang):
