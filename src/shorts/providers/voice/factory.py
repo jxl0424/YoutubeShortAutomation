@@ -11,9 +11,15 @@ from ...config.settings import VoiceConfig
 from ...domain.exceptions import ShortsConfigurationError
 from ...domain.interfaces import VoiceProvider
 from .edge_tts_provider import EdgeTTSVoiceProvider
+from .kokoro_provider import KokoroVoiceProvider
 
 
 def build_voice_provider(config: VoiceConfig) -> VoiceProvider:
     if config.provider == "edge_tts":
         return EdgeTTSVoiceProvider()
+    if config.provider == "kokoro":
+        return KokoroVoiceProvider(
+            model_path=config.kokoro_model_path,
+            voices_path=config.kokoro_voices_path,
+        )
     raise ShortsConfigurationError(f"unknown voice provider: {config.provider!r}")

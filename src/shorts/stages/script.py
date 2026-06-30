@@ -62,7 +62,11 @@ Requirements:
 - Split the narration into 3-6 `scenes`. For each scene provide:
   - `narration`: that scene's spoken segment,
   - `on_screen_text`: a very short caption (a few words),
-  - `visual_instruction`: a concrete description of what to show on screen.
+  - `visual_instruction`: a SHORT real-world subject to film, 2-5 words, leading
+    with the concrete subject so it works as a stock-footage search query
+    (e.g. "aurora borealis over mountains", "solar flare on the sun"). Name a
+    literal, filmable thing. Do NOT describe animations, illustrations, diagrams,
+    cartoons, abstract concepts, on-screen text, or camera movements.
 {cta_line}
 
 Respond with ONE JSON object and nothing else, matching exactly:

@@ -130,6 +130,23 @@ def test_pollinations_empty_raises(tmp_path):
         provider.fetch(_scene(0), tmp_path)
 
 
+def test_pollinations_applies_model_and_style(tmp_path):
+    captured = {}
+
+    def grab(url):
+        captured["url"] = url
+        return b"img"
+
+    provider = PollinationsVisualProvider(
+        model="flux", style="cinematic, photorealistic", download=grab
+    )
+    asset = provider.fetch(_scene(0, query="aurora over mountains"), tmp_path)
+    assert "model=flux" in captured["url"]
+    # style is appended to the (URL-encoded) prompt
+    assert "cinematic" in asset.source_url
+    assert "aurora" in asset.source_url
+
+
 # --- Pexels ---------------------------------------------------------------- #
 PEXELS_JSON = {
     "videos": [
@@ -156,6 +173,38 @@ def test_pexels_picks_portrait_and_downloads(tmp_path):
     assert asset.width == 1080 and asset.height == 1920
     assert asset.duration_seconds == 12.0
     assert asset.path.exists()
+
+
+def test_pexels_prefers_relevance_over_resolution(tmp_path):
+    # First (most relevant) video is portrait but smaller; a later result is 4K.
+    # The most relevant adequate clip must win, not the highest resolution.
+    data = {
+        "videos": [
+            {
+                "duration": 8,
+                "video_files": [
+                    {"width": 1080, "height": 1920, "link": "relevant.mp4"}
+                ],
+            },
+            {
+                "duration": 5,
+                "video_files": [{"width": 2160, "height": 3840, "link": "huge.mp4"}],
+            },
+        ]
+    }
+    provider = PexelsVisualProvider(
+        api_key="k", search=lambda q: data, download=lambda url: b"v"
+    )
+    asset = provider.fetch(_scene(0), tmp_path)
+    assert asset.source_url == "relevant.mp4"
+
+
+def test_pexels_shortens_query_to_subject():
+    q = "Shimmering green aurora over snowy mountains, with the camera panning"
+    assert (
+        PexelsVisualProvider._search_query(q)
+        == "Shimmering green aurora over snowy mountains"
+    )
 
 
 def test_pexels_no_portrait_raises(tmp_path):

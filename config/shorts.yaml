@@ -25,11 +25,13 @@ metadata:
   hashtag_count: 5
 
 voice:
-  provider: edge_tts    # credential-free
-  voice: en-US-AriaNeural
+  provider: kokoro      # local offline neural TTS (Apache-2.0); edge_tts also available
+  voice: af_heart       # Kokoro flagship voice (use en-US-AriaNeural etc. with edge_tts)
   language: en
   rate: "+0%"
   pitch: "+0Hz"
+  kokoro_model_path: models/kokoro/kokoro-v1.0.onnx
+  kokoro_voices_path: models/kokoro/voices-v1.0.bin
 
 visual_planning:
   words_per_second: 2.5
@@ -44,6 +46,8 @@ assets:
     pixabay_api_key_env: PIXABAY_API_KEY
   generated:
     provider: pollinations    # credential-free image generation
+    model: flux               # higher-quality Pollinations model
+    style: "cinematic, photorealistic, vivid color, dramatic lighting, vertical composition"
     api_key_env: null
 
 validation:

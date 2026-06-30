@@ -14,6 +14,7 @@ from shorts.domain.models import CaptionCue, Script, VoiceResult
 from shorts.pipeline import PipelineContext
 from shorts.providers.voice.edge_tts_provider import EdgeTTSVoiceProvider
 from shorts.providers.voice.factory import build_voice_provider
+from shorts.providers.voice.kokoro_provider import KokoroVoiceProvider
 from shorts.providers.voice.subtitles import cues_to_srt, group_words_into_cues
 from shorts.stages.voice import VoiceGenerator
 
@@ -80,9 +81,67 @@ def test_factory_builds_edge_tts():
     assert isinstance(provider, EdgeTTSVoiceProvider)
 
 
+def test_factory_builds_kokoro():
+    provider = build_voice_provider(VoiceConfig(provider="kokoro"))
+    assert isinstance(provider, KokoroVoiceProvider)
+    assert provider.name == "kokoro"
+
+
 def test_factory_rejects_unknown_provider():
     with pytest.raises(ShortsConfigurationError):
         build_voice_provider(VoiceConfig(provider="does_not_exist"))
+
+
+# --- kokoro provider ------------------------------------------------------- #
+def test_kokoro_rate_to_speed():
+    assert KokoroVoiceProvider._rate_to_speed(None) == 1.0
+    assert KokoroVoiceProvider._rate_to_speed("+0%") == 1.0
+    assert abs(KokoroVoiceProvider._rate_to_speed("+10%") - 1.1) < 1e-9
+    assert abs(KokoroVoiceProvider._rate_to_speed("-20%") - 0.8) < 1e-9
+    assert KokoroVoiceProvider._rate_to_speed("garbage") == 1.0
+
+
+def test_kokoro_estimates_word_times_span_duration():
+    words = KokoroVoiceProvider._estimate_word_times("one two three", 6.0)
+    assert len(words) == 3
+    assert words[0][0] == 0.0
+    assert abs(words[-1][1] - 6.0) < 1e-9  # last word ends at the audio duration
+
+
+def test_kokoro_synthesizes_mp3_and_cues(tmp_path):
+    import numpy as np
+
+    def fake_synth(text, voice, speed, lang):
+        assert voice == "af_heart" and lang == "en-us"
+        return np.zeros(24000, dtype=np.float32), 24000  # 1.0s of silence
+
+    provider = KokoroVoiceProvider(
+        model_path="x.onnx", voices_path="v.bin", synth=fake_synth
+    )
+    result = provider.synthesize(
+        text="hello from kokoro", output_dir=tmp_path, voice="af_heart", language="en"
+    )
+    assert result.audio_path.exists() and result.audio_path.name == "narration.mp3"
+    assert result.subtitle_path.exists()
+    assert result.cues
+    assert abs(result.duration_seconds - 1.0) < 0.05
+
+
+def test_kokoro_rejects_empty_text(tmp_path):
+    with pytest.raises(VoiceError):
+        KokoroVoiceProvider(model_path="x", voices_path="v").synthesize(
+            text="  ", output_dir=tmp_path, voice="af_heart", language="en"
+        )
+
+
+def test_kokoro_missing_model_raises(tmp_path):
+    provider = KokoroVoiceProvider(
+        model_path=str(tmp_path / "absent.onnx"), voices_path=str(tmp_path / "v.bin")
+    )
+    with pytest.raises(VoiceError):
+        provider.synthesize(
+            text="hi", output_dir=tmp_path, voice="af_heart", language="en"
+        )
 
 
 def test_edge_provider_rejects_empty_text(tmp_path):

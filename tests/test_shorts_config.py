@@ -12,7 +12,8 @@ from shorts.domain.models import VisualType
 def test_load_default_config():
     config = ShortsConfig.load(load_env=False)
     assert config.script.provider == "gemini_flash"
-    assert config.voice.provider == "edge_tts"
+    assert config.voice.provider == "kokoro"
+    assert config.voice.voice == "af_heart"
     assert config.video.width == 1080
     assert config.video.height == 1920
     assert config.upload.enabled is False

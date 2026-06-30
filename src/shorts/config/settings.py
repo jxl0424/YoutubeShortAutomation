@@ -59,6 +59,9 @@ class VoiceConfig(_Section):
     language: str = "en"
     rate: str = "+0%"
     pitch: str = "+0Hz"
+    # Local Kokoro model files (only used when provider == "kokoro").
+    kokoro_model_path: str = "models/kokoro/kokoro-v1.0.onnx"
+    kokoro_voices_path: str = "models/kokoro/voices-v1.0.bin"
 
 
 class VisualPlanningConfig(_Section):
@@ -77,7 +80,11 @@ class StockConfig(_Section):
 
 class GeneratedImageConfig(_Section):
     provider: str = "pollinations"  # credential-free default
-    model: str | None = None
+    model: str | None = "flux"  # higher-quality Pollinations model
+    style: str | None = (
+        "cinematic, photorealistic, vivid color, dramatic lighting, "
+        "vertical composition"
+    )
     api_key_env: str | None = None
     api_key: str | None = None
 

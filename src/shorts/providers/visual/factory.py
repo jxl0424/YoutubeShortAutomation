@@ -23,7 +23,13 @@ def build_visual_providers(
     for name in config.providers:
         if name == "pollinations":
             providers.append(
-                PollinationsVisualProvider(width=width, height=height, timeout=timeout)
+                PollinationsVisualProvider(
+                    width=width,
+                    height=height,
+                    timeout=timeout,
+                    model=config.generated.model,
+                    style=config.generated.style,
+                )
             )
         elif name == "pexels":
             if config.stock.pexels_api_key:

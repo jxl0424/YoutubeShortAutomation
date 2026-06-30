@@ -31,11 +31,15 @@ class PollinationsVisualProvider(VisualProvider):
         width: int = 1080,
         height: int = 1920,
         timeout: float = 30.0,
+        model: str | None = None,
+        style: str | None = None,
         download: Callable[[str], bytes] | None = None,
     ) -> None:
         self._width = width
         self._height = height
         self._timeout = timeout
+        self._model = model
+        self._style = style
         self._download = download or self._http_download
 
     def _http_download(self, url: str) -> bytes:
@@ -45,11 +49,20 @@ class PollinationsVisualProvider(VisualProvider):
         response.raise_for_status()
         return response.content
 
+    def _prompt(self, scene: Scene) -> str:
+        # Style-anchor the LLM's visual instruction toward a consistent, realistic
+        # look so generations don't drift into abstract art.
+        if self._style:
+            return f"{scene.visual_query}, {self._style}"
+        return scene.visual_query
+
     def _url(self, scene: Scene) -> str:
-        return (
-            f"{_BASE}{quote(scene.visual_query)}"
-            f"?width={self._width}&height={self._height}&nologo=true&seed={scene.index}"
+        params = (
+            f"width={self._width}&height={self._height}&nologo=true&seed={scene.index}"
         )
+        if self._model:
+            params += f"&model={self._model}"
+        return f"{_BASE}{quote(self._prompt(scene))}?{params}"
 
     def fetch(self, scene: Scene, output_dir: Path) -> VisualAsset:
         output_dir.mkdir(parents=True, exist_ok=True)

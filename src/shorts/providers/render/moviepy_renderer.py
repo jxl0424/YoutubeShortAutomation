@@ -88,7 +88,7 @@ class MoviePyRenderer(VideoRenderer):
     def _scene_clip(
         self, scene: RenderScene, request: RenderRequest, opened: list[Any]
     ) -> Any:
-        from moviepy import ImageClip, VideoFileClip
+        from moviepy import VideoFileClip
 
         w, h, d = request.width, request.height, scene.duration_seconds
         if scene.visual_type in _VIDEO_TYPES:
@@ -97,10 +97,39 @@ class MoviePyRenderer(VideoRenderer):
             clip = self._fit_video(clip, d)
             return self._fill(clip, w, h)
 
-        base = self._fill(ImageClip(str(scene.asset_path)).with_duration(d), w, h)
+        base = self._still_clip(scene.asset_path, w, h, d)
         if not request.ken_burns:
             return base
         return self._ken_burns(base, w, h, d)
+
+    def _still_clip(self, path: Path, w: int, h: int, d: float) -> Any:
+        from moviepy import ImageClip
+
+        # Generated images can come back well below the frame size (Pollinations
+        # caps at 576x1024), so a naive fill upscales them soft. Upscale with
+        # Lanczos + an unsharp mask first, then the clip is already frame-sized.
+        try:
+            return ImageClip(self._upscale_sharpen(path, w, h)).with_duration(d)
+        except Exception:
+            self._logger.warning("still_upscale_failed", path=str(path))
+            return self._fill(ImageClip(str(path)).with_duration(d), w, h)
+
+    @staticmethod
+    def _upscale_sharpen(path: Path, w: int, h: int) -> Any:
+        import numpy as np
+        from PIL import Image, ImageFilter
+
+        img = Image.open(path).convert("RGB")
+        scale = max(w / img.width, h / img.height)
+        img = img.resize(
+            (round(img.width * scale), round(img.height * scale)), Image.LANCZOS
+        )
+        if scale > 1.0:
+            img = img.filter(
+                ImageFilter.UnsharpMask(radius=2.2, percent=130, threshold=2)
+            )
+        left, top = (img.width - w) // 2, (img.height - h) // 2
+        return np.asarray(img.crop((left, top, left + w, top + h)))
 
     def _fit_video(self, clip: Any, duration: float) -> Any:
         if clip.duration >= duration:
@@ -163,21 +192,31 @@ class MoviePyRenderer(VideoRenderer):
             import imageio_ffmpeg
 
             ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
+            # Burning subtitles forces a video re-encode; mirror the configured
+            # quality target here, otherwise this pass falls back to libx264's
+            # default CRF and discards the bitrate MoviePy used for the raw file
+            # (which is what made low-detail renders come out blurry).
+            quality = ["-c:v", "libx264", "-preset", "medium", "-pix_fmt", "yuv420p"]
+            if request.bitrate:
+                quality += ["-b:v", request.bitrate]
             # Run in the subtitle's directory so the filter gets a bare filename
-            # (avoids Windows path-escaping issues in the subtitles filter).
+            # (avoids Windows path-escaping issues in the subtitles filter). The
+            # in/out video paths must be absolute since cwd changes underneath us.
+            subtitle_path = Path(subtitle)
             subprocess.run(
                 [
                     ffmpeg,
                     "-y",
                     "-i",
-                    str(raw_path),
+                    str(raw_path.resolve()),
                     "-vf",
-                    f"subtitles={Path(subtitle).name}",
+                    f"subtitles={subtitle_path.name}",
+                    *quality,
                     "-c:a",
                     "copy",
-                    str(request.output_path),
+                    str(request.output_path.resolve()),
                 ],
-                cwd=str(Path(subtitle).parent),
+                cwd=str(subtitle_path.resolve().parent),
                 check=True,
                 capture_output=True,
             )

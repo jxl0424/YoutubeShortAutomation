@@ -8,6 +8,7 @@ the search and the download are injectable so tests never hit the network.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, ClassVar
@@ -66,29 +67,39 @@ class PexelsVisualProvider(VisualProvider):
 
     # --- selection ------------------------------------------------------- #
     def _pick(self, data: dict[str, Any]) -> tuple[str, int, int, float | None]:
-        videos = data.get("videos") or []
-        best: tuple[str, int, int, float | None] | None = None
-        best_height = -1
-        for video in videos:
+        # Pexels returns videos in relevance order, so honor that: take the
+        # first video that has a portrait file meeting the height floor (picking
+        # its largest such file). Maximizing resolution across all results
+        # instead would grab the biggest clip regardless of topical relevance.
+        for video in data.get("videos") or []:
             duration = video.get("duration")
+            best: tuple[str, int, int, float | None] | None = None
+            best_height = -1
             for file in video.get("video_files") or []:
                 width = int(file.get("width") or 0)
                 height = int(file.get("height") or 0)
                 link = file.get("link")
                 if not link:
                     continue
-                # Prefer portrait files at or above the minimum height.
                 portrait = height >= width and height >= self._min_height
                 if portrait and height > best_height:
                     best, best_height = (link, width, height, duration), height
-        if best is None:
-            raise VisualError("pexels returned no suitable portrait video")
-        return best
+            if best is not None:
+                return best
+        raise VisualError("pexels returned no suitable portrait video")
+
+    @staticmethod
+    def _search_query(query: str) -> str:
+        # Stock search ranks far better on a short subject phrase than on the
+        # script's full visual instruction, so drop trailing camera/direction
+        # filler ("..., with the camera panning across the sky").
+        first = re.split(r"[,.;]", query, maxsplit=1)[0].strip()
+        return first or query
 
     def fetch(self, scene: Scene, output_dir: Path) -> VisualAsset:
         output_dir.mkdir(parents=True, exist_ok=True)
         try:
-            data = self._search(scene.visual_query)
+            data = self._search(self._search_query(scene.visual_query))
             link, width, height, duration = self._pick(data)
             content = self._download(link)
         except VisualError:

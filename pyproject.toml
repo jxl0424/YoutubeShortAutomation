@@ -35,6 +35,9 @@ dev = [
 reddit = ["praw>=7.7"]
 # Stage 2 YouTube upload (optional; lazy-imported):
 youtube = ["google-api-python-client>=2", "google-auth-oauthlib>=1"]
+# Stage 2 local offline TTS (Kokoro; lazy-imported). Model files are downloaded
+# separately into models/kokoro/ (see README), not shipped with the package.
+kokoro = ["kokoro-onnx>=0.4", "soundfile>=0.12"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
