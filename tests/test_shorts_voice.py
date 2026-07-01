@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import subprocess
+import sys
+import types
 from pathlib import Path
 
 import pytest
@@ -144,6 +147,86 @@ def test_kokoro_missing_model_raises(tmp_path):
         provider.synthesize(
             text="hi", output_dir=tmp_path, voice="af_heart", language="en"
         )
+
+
+# The tests below stub soundfile/imageio_ffmpeg/subprocess so they run without
+# the optional [kokoro] extra or a real ffmpeg (unlike the mp3 test above).
+def _stub_audio_deps(monkeypatch, run_fn):
+    def fake_sf_write(path, samples, sample_rate):
+        Path(path).write_bytes(b"RIFF-fake-wav")
+
+    monkeypatch.setitem(
+        sys.modules, "soundfile", types.SimpleNamespace(write=fake_sf_write)
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "imageio_ffmpeg",
+        types.SimpleNamespace(get_ffmpeg_exe=lambda: "ffmpeg"),
+    )
+    monkeypatch.setattr(subprocess, "run", run_fn)
+
+
+def _silence(frames=24000):
+    import numpy as np
+
+    return np.zeros(frames, dtype=np.float32), 24000
+
+
+def test_kokoro_mp3_argv_and_wav_cleanup(tmp_path, monkeypatch):
+    captured = {}
+
+    def fake_run(cmd, **kwargs):
+        captured["cmd"] = cmd
+        Path(cmd[-1]).write_bytes(b"mp3")
+
+    _stub_audio_deps(monkeypatch, fake_run)
+    provider = KokoroVoiceProvider(
+        model_path="x.onnx", voices_path="v.bin", synth=lambda t, v, s, lg: _silence()
+    )
+    result = provider.synthesize(
+        text="hello", output_dir=tmp_path, voice="af_heart", language="en"
+    )
+    assert "-b:a" in captured["cmd"] and "128k" in captured["cmd"]
+    assert not (tmp_path / "_narration.wav").exists()  # intermediate wav removed
+    assert result.audio_path.name == "narration.mp3"
+
+
+def test_kokoro_ffmpeg_failure_raises_voice_error_and_cleans_wav(tmp_path, monkeypatch):
+    def failing_run(cmd, **kwargs):
+        raise subprocess.CalledProcessError(1, cmd, stderr=b"boom")
+
+    _stub_audio_deps(monkeypatch, failing_run)
+    provider = KokoroVoiceProvider(
+        model_path="x.onnx", voices_path="v.bin", synth=lambda t, v, s, lg: _silence()
+    )
+    with pytest.raises(VoiceError):
+        provider.synthesize(
+            text="hello", output_dir=tmp_path, voice="af_heart", language="en"
+        )
+    assert not (tmp_path / "_narration.wav").exists()  # no orphan on failure
+
+
+def test_kokoro_empty_audio_raises(tmp_path):
+    provider = KokoroVoiceProvider(
+        model_path="x.onnx", voices_path="v.bin", synth=lambda t, v, s, lg: _silence(0)
+    )
+    with pytest.raises(VoiceError):
+        provider.synthesize(
+            text="hi", output_dir=tmp_path, voice="af_heart", language="en"
+        )
+
+
+def test_kokoro_british_voice_selects_en_gb(tmp_path, monkeypatch):
+    seen = {}
+
+    def synth(text, voice, speed, lang):
+        seen["lang"] = lang
+        return _silence()
+
+    _stub_audio_deps(monkeypatch, lambda cmd, **kw: Path(cmd[-1]).write_bytes(b"mp3"))
+    provider = KokoroVoiceProvider(model_path="x", voices_path="v", synth=synth)
+    provider.synthesize(text="hi", output_dir=tmp_path, voice="bf_alice", language="en")
+    assert seen["lang"] == "en-gb"
 
 
 def test_edge_provider_rejects_empty_text(tmp_path):

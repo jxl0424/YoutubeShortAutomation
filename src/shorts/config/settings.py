@@ -56,9 +56,10 @@ class MetadataConfig(_Section):
 class VoiceConfig(_Section):
     provider: str = "edge_tts"
     voice: str = "en-US-AriaNeural"
+    # Note: current providers derive language from the voice name (e.g. Kokoro's
+    # bf_/bm_ prefixes -> en-gb); this field is a forward-looking interface param.
     language: str = "en"
     rate: str = "+0%"
-    pitch: str = "+0Hz"
     # Local Kokoro model files (only used when provider == "kokoro").
     kokoro_model_path: str = "models/kokoro/kokoro-v1.0.onnx"
     kokoro_voices_path: str = "models/kokoro/voices-v1.0.bin"

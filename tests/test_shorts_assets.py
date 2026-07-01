@@ -218,6 +218,21 @@ def test_pexels_no_portrait_raises(tmp_path):
         provider.fetch(_scene(0), tmp_path)
 
 
+def test_pexels_query_ignores_leading_punctuation():
+    q = ", aurora over mountains, with the camera panning"
+    assert PexelsVisualProvider._search_query(q) == "aurora over mountains"
+
+
+def test_pexels_empty_download_raises_and_leaves_no_artifacts(tmp_path):
+    provider = PexelsVisualProvider(
+        api_key="k", search=lambda q: PEXELS_JSON, download=lambda url: b""
+    )
+    with pytest.raises(VisualError):
+        provider.fetch(_scene(0), tmp_path)
+    # Neither a final asset nor a .part temp file may remain.
+    assert list(tmp_path.iterdir()) == []
+
+
 # --- factory --------------------------------------------------------------- #
 def test_factory_skips_pexels_without_key():
     config = AssetsConfig(providers=["pexels", "pollinations"])

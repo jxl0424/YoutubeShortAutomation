@@ -1,6 +1,7 @@
 # Stage 2 — Shorts generation configuration.
 # Everything is configurable here; secrets are read from env vars named by the
-# *_env keys (never stored in YAML). Defaults are runnable without paid keys.
+# *_env keys (never stored in YAML). Defaults need no PAID keys, but the default
+# voice (kokoro) requires a one-time free model download — see the voice section.
 
 language: en
 
@@ -25,11 +26,13 @@ metadata:
   hashtag_count: 5
 
 voice:
-  provider: kokoro      # local offline neural TTS (Apache-2.0); edge_tts also available
+  # Kokoro is local offline neural TTS (Apache-2.0). It needs a one-time setup:
+  # `pip install -e ".[kokoro]"` plus the model files in models/kokoro/ (see
+  # README). Set provider to edge_tts for a zero-setup online alternative.
+  provider: kokoro
   voice: af_heart       # Kokoro flagship voice (use en-US-AriaNeural etc. with edge_tts)
   language: en
   rate: "+0%"
-  pitch: "+0Hz"
   kokoro_model_path: models/kokoro/kokoro-v1.0.onnx
   kokoro_voices_path: models/kokoro/voices-v1.0.bin
 

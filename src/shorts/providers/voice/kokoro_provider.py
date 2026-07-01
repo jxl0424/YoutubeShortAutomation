@@ -58,18 +58,22 @@ class KokoroVoiceProvider(VoiceProvider):
 
         speed = self._rate_to_speed(rate)
         lang = "en-gb" if voice.startswith(("bf_", "bm_")) else "en-us"
+        # Everything below the synth call can also fail (soundfile/ffmpeg/IO), so
+        # the whole path is wrapped to honor the VoiceError contract.
         try:
             samples, sample_rate = self._run_synth(text, voice, speed, lang)
+            if len(samples) == 0:
+                raise VoiceError("kokoro produced empty audio")
+            audio_path = self._write_mp3(samples, sample_rate, output_dir)
+            duration = len(samples) / sample_rate
+            words = self._estimate_word_times(text, duration)
+            cues = group_words_into_cues(words)
+            subtitle_path = output_dir / "captions.srt"
+            subtitle_path.write_text(cues_to_srt(cues), encoding="utf-8")
+        except VoiceError:
+            raise
         except Exception as exc:
             raise VoiceError(f"kokoro synthesis failed: {exc}") from exc
-
-        audio_path = self._write_mp3(samples, sample_rate, output_dir)
-
-        duration = len(samples) / sample_rate
-        words = self._estimate_word_times(text, duration)
-        cues = group_words_into_cues(words)
-        subtitle_path = output_dir / "captions.srt"
-        subtitle_path.write_text(cues_to_srt(cues), encoding="utf-8")
 
         return VoiceResult(
             audio_path=audio_path,
@@ -104,15 +108,19 @@ class KokoroVoiceProvider(VoiceProvider):
         import soundfile as sf
 
         wav_path = output_dir / "_narration.wav"
-        sf.write(str(wav_path), samples, sample_rate)
         audio_path = output_dir / "narration.mp3"
-        ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
-        subprocess.run(
-            [ffmpeg, "-y", "-i", str(wav_path), "-b:a", "128k", str(audio_path)],
-            check=True,
-            capture_output=True,
-        )
-        wav_path.unlink(missing_ok=True)
+        try:
+            sf.write(str(wav_path), samples, sample_rate)
+            ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
+            subprocess.run(
+                [ffmpeg, "-y", "-i", str(wav_path), "-b:a", "128k", str(audio_path)],
+                check=True,
+                capture_output=True,
+                timeout=120,
+            )
+        finally:
+            # Never orphan the intermediate wav, even when ffmpeg fails.
+            wav_path.unlink(missing_ok=True)
         return audio_path
 
     # --- helpers --------------------------------------------------------- #

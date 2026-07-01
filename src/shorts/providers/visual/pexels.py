@@ -8,6 +8,7 @@ the search and the download are injectable so tests never hit the network.
 
 from __future__ import annotations
 
+import os
 import re
 from collections.abc import Callable
 from pathlib import Path
@@ -39,7 +40,7 @@ class PexelsVisualProvider(VisualProvider):
         self._per_page = per_page
         self._timeout = timeout
         self._search = search or self._http_search
-        self._download = download or self._http_download
+        self._download = download  # None -> stream via httpx (see _save)
 
     # --- network (injectable) ------------------------------------------- #
     def _http_search(self, query: str) -> dict[str, Any]:
@@ -58,12 +59,21 @@ class PexelsVisualProvider(VisualProvider):
         response.raise_for_status()
         return response.json()
 
-    def _http_download(self, url: str) -> bytes:
+    def _save(self, url: str, dest: Path) -> None:
+        # Injected downloaders (tests) return bytes; the default path streams the
+        # (potentially large) video to disk in chunks instead of buffering it all.
+        if self._download is not None:
+            dest.write_bytes(self._download(url))
+            return
         import httpx
 
-        response = httpx.get(url, timeout=self._timeout, follow_redirects=True)
-        response.raise_for_status()
-        return response.content
+        with httpx.stream(
+            "GET", url, timeout=self._timeout, follow_redirects=True
+        ) as response:
+            response.raise_for_status()
+            with dest.open("wb") as fh:
+                for chunk in response.iter_bytes():
+                    fh.write(chunk)
 
     # --- selection ------------------------------------------------------- #
     def _pick(self, data: dict[str, Any]) -> tuple[str, int, int, float | None]:
@@ -92,25 +102,33 @@ class PexelsVisualProvider(VisualProvider):
     def _search_query(query: str) -> str:
         # Stock search ranks far better on a short subject phrase than on the
         # script's full visual instruction, so drop trailing camera/direction
-        # filler ("..., with the camera panning across the sky").
-        first = re.split(r"[,.;]", query, maxsplit=1)[0].strip()
+        # filler ("..., with the camera panning across the sky"). Take the first
+        # NON-EMPTY clause so leading punctuation doesn't defeat the shortening.
+        clauses = (part.strip() for part in re.split(r"[,.;]", query))
+        first = next((part for part in clauses if part), "")
         return first or query
 
     def fetch(self, scene: Scene, output_dir: Path) -> VisualAsset:
         output_dir.mkdir(parents=True, exist_ok=True)
+        path = output_dir / f"scene_{scene.index:02d}.mp4"
+        # Download to a temp name, then atomically move into place, so a
+        # truncated/failed download never leaves a corrupt final asset.
+        tmp = path.with_name(path.name + ".part")
         try:
             data = self._search(self._search_query(scene.visual_query))
             link, width, height, duration = self._pick(data)
-            content = self._download(link)
+            self._save(link, tmp)
+            if not tmp.exists() or tmp.stat().st_size == 0:
+                raise VisualError(
+                    f"pexels returned empty video for scene {scene.index}"
+                )
+            os.replace(tmp, path)
         except VisualError:
             raise
         except Exception as exc:
             raise VisualError(f"pexels failed for scene {scene.index}: {exc}") from exc
-        if not content:
-            raise VisualError(f"pexels returned empty video for scene {scene.index}")
-
-        path = output_dir / f"scene_{scene.index:02d}.mp4"
-        path.write_bytes(content)
+        finally:
+            tmp.unlink(missing_ok=True)
         return VisualAsset(
             scene_index=scene.index,
             visual_type=VisualType.STOCK_VIDEO,

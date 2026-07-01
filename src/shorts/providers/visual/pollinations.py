@@ -9,6 +9,7 @@ downloader is injectable so tests never hit the network.
 
 from __future__ import annotations
 
+import os
 from collections.abc import Callable
 from pathlib import Path
 from typing import ClassVar
@@ -62,7 +63,9 @@ class PollinationsVisualProvider(VisualProvider):
         )
         if self._model:
             params += f"&model={self._model}"
-        return f"{_BASE}{quote(self._prompt(scene))}?{params}"
+        # safe="" also encodes "/" so nothing in the LLM-derived prompt can add
+        # path segments (defense-in-depth; the host and params are fixed).
+        return f"{_BASE}{quote(self._prompt(scene), safe='')}?{params}"
 
     def fetch(self, scene: Scene, output_dir: Path) -> VisualAsset:
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -79,7 +82,14 @@ class PollinationsVisualProvider(VisualProvider):
             )
 
         path = output_dir / f"scene_{scene.index:02d}.jpg"
-        path.write_bytes(data)
+        # Write via a temp name + atomic replace so a failed write never leaves
+        # a truncated final asset.
+        tmp = path.with_name(path.name + ".part")
+        try:
+            tmp.write_bytes(data)
+            os.replace(tmp, path)
+        finally:
+            tmp.unlink(missing_ok=True)
         return VisualAsset(
             scene_index=scene.index,
             visual_type=VisualType.GENERATED_IMAGE,

@@ -40,14 +40,15 @@ SelectedTopic → script → metadata → voice → visual planning → asset co
 
 Each stage is an independent, replaceable `PipelineStage`; external services sit
 behind provider interfaces (LLM, voice, visual, renderer, thumbnail, storage,
-upload) selected by config. **All Stage-2 stages are complete and verified with a
-full live run** (NVIDIA NIM → edge-tts → Pollinations → MoviePy/FFmpeg → Pillow).
+upload) selected by config. **All Stage-2 stages are complete and verified with
+full live runs** (NVIDIA NIM → Kokoro → Pexels/Pollinations → MoviePy/FFmpeg →
+Pillow).
 
-| Provider | Default | Credentials |
-|----------|---------|-------------|
+| Provider | Default | Credentials / setup |
+|----------|---------|---------------------|
 | Script / Metadata (LLM) | Gemini Flash (fallback Groq/OpenRouter) | `GEMINI_API_KEY` (or set `script.provider: nvidia_nim` to reuse `NVIDIA_API_KEY`) |
-| Voice | edge-tts | none |
-| Visuals | Pollinations (image gen) + Pexels (stock video) | Pollinations none; Pexels `PEXELS_API_KEY` |
+| Voice | Kokoro `af_heart` (local, offline) | no key, but one-time setup: `pip install -e ".[kokoro]"` + download `kokoro-v1.0.onnx` and `voices-v1.0.bin` into `models/kokoro/` (kokoro-onnx GitHub release). Zero-setup alternative: `voice.provider: edge_tts` |
+| Visuals | Pexels (stock video) → Pollinations (image gen) fallback | Pexels `PEXELS_API_KEY` (free); Pollinations none |
 | Render | MoviePy + bundled FFmpeg | none (imageio-ffmpeg) |
 | Upload | YouTube Data API v3 (off by default) | `YOUTUBE_CLIENT_SECRETS` + `pip install -e ".[youtube]"` |
 

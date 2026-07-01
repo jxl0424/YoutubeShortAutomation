@@ -45,13 +45,19 @@ class MoviePyRenderer(VideoRenderer):
             clips = [self._scene_clip(s, request, opened) for s in request.scenes]
             if not clips:
                 raise RenderError("no scenes to render")
+            # Derived/composite clips hold their own reader handles; track them
+            # alongside the file-opened clips so the finally block closes all.
+            opened.extend(clips)
 
             video = concatenate_videoclips(clips, method="compose")
+            opened.append(video)
             duration = min(video.duration, total)
             video = video.subclipped(0, duration)
+            opened.append(video)
             video = video.with_audio(
                 self._build_audio(audio, request, duration, opened)
             )
+            opened.append(video)
 
             raw_path = request.output_path.with_name("render_raw.mp4")
             video.write_videofile(
@@ -62,6 +68,9 @@ class MoviePyRenderer(VideoRenderer):
                 bitrate=request.bitrate,
                 threads=4,
                 logger=None,
+                # Keep MoviePy's *TEMP_MPY_* audio scratch file in the work dir
+                # (default is the process CWD, which litters the repo on crash).
+                temp_audiofile_path=str(raw_path.parent),
             )
         except RenderError:
             raise
@@ -110,8 +119,8 @@ class MoviePyRenderer(VideoRenderer):
         # Lanczos + an unsharp mask first, then the clip is already frame-sized.
         try:
             return ImageClip(self._upscale_sharpen(path, w, h)).with_duration(d)
-        except Exception:
-            self._logger.warning("still_upscale_failed", path=str(path))
+        except Exception as exc:
+            self._logger.warning("still_upscale_failed", path=str(path), error=str(exc))
             return self._fill(ImageClip(str(path)).with_duration(d), w, h)
 
     @staticmethod
@@ -165,6 +174,7 @@ class MoviePyRenderer(VideoRenderer):
         self, narration: Any, request: RenderRequest, duration: float, opened: list[Any]
     ) -> Any:
         narration = narration.subclipped(0, duration)
+        opened.append(narration)
         if not (request.music_path and Path(request.music_path).exists()):
             return narration
         try:
@@ -177,7 +187,10 @@ class MoviePyRenderer(VideoRenderer):
             else:
                 music = music.subclipped(0, duration)
             music = music.with_effects([afx.MultiplyVolume(request.music_volume)])
-            return CompositeAudioClip([narration, music])
+            opened.append(music)
+            mixed = CompositeAudioClip([narration, music])
+            opened.append(mixed)
+            return mixed
         except Exception as exc:
             self._logger.warning("music_mix_failed", error=str(exc))
             return narration
@@ -219,8 +232,18 @@ class MoviePyRenderer(VideoRenderer):
                 cwd=str(subtitle_path.resolve().parent),
                 check=True,
                 capture_output=True,
+                timeout=600,
             )
             raw_path.unlink(missing_ok=True)
         except Exception as exc:
-            self._logger.warning("subtitle_burn_failed", error=str(exc))
+            # Degrade gracefully (ship the raw video + packaged soft-sub SRT),
+            # but surface ffmpeg's stderr so burn failures are diagnosable.
+            stderr = getattr(exc, "stderr", None)
+            if isinstance(stderr, bytes):
+                stderr = stderr.decode(errors="replace")
+            self._logger.error(
+                "subtitle_burn_failed",
+                error=str(exc),
+                ffmpeg_stderr=(stderr or "")[-2000:],
+            )
             shutil.move(str(raw_path), str(request.output_path))
