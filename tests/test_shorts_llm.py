@@ -136,6 +136,17 @@ def test_factory_builds_chain_with_primary_key():
     assert llm._providers[0].name == "gemini_flash"
 
 
+def test_factory_passes_timeout_to_providers():
+    config = ScriptConfig(
+        provider="gemini_flash",
+        api_key="gem",
+        fallback_providers=[],
+        timeout_seconds=99.0,
+    )
+    llm = build_script_llm(config)
+    assert llm._providers[0]._timeout == 99.0
+
+
 def test_factory_skips_providers_without_keys(monkeypatch):
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
     monkeypatch.setenv("OPENROUTER_API_KEY", "or-key")

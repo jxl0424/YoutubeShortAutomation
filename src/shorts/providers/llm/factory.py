@@ -65,6 +65,7 @@ def build_script_llm(config: ScriptConfig) -> LLMProvider:
                 model=model,
                 temperature=config.temperature,
                 max_tokens=config.max_tokens,
+                timeout=config.timeout_seconds,
                 name=name,
             )
         )

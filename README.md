@@ -52,6 +52,25 @@ Pillow).
 | Render | MoviePy + bundled FFmpeg | none (imageio-ffmpeg) |
 | Upload | YouTube Data API v3 (off by default) | `YOUTUBE_CLIENT_SECRETS` + `pip install -e ".[youtube]"` |
 
+```bash
+# End-to-end: Stage 1 discovery -> Stage 2 generation:
+python -m shorts
+# or, after install:  shorts-generate
+
+# Reuse a saved topic instead of re-running discovery:
+trend-discovery --json > topic.json
+python -m shorts --topic-json topic.json
+
+# Useful flags:
+#   --override "Some title"   manually select the topic in discovery
+#   --mock-llm                offline mock LLM for discovery
+#   --work-dir output/my-run  choose the output folder
+#   --json                    print the generated package as JSON
+#   --log-level INFO          show structured stage logs
+```
+
+Or from Python:
+
 ```python
 from trend_intelligence.domain.models import SelectedTopic   # from Stage 1
 from shorts import ShortsConfig, build_pipeline
@@ -97,7 +116,7 @@ skipped, so a single outage never breaks a run.
 ## Run tests & lint
 
 ```bash
-pytest                 # 114 tests, all external APIs mocked
+pytest                 # 244 tests, all external APIs mocked
 ruff check .           # lint
 ruff format .          # auto-format
 ```

@@ -24,6 +24,7 @@ dependencies = [
 
 [project.scripts]
 trend-discovery = "trend_intelligence.cli:main"
+shorts-generate = "shorts.cli:main"
 
 [project.optional-dependencies]
 dev = [

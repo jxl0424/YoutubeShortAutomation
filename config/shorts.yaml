@@ -11,10 +11,11 @@ enrichment:
 
 script:
   provider: gemini_flash
-  fallback_providers: [groq, openrouter]
+  fallback_providers: [groq, openrouter, nvidia_nim]
   model: gemini-2.0-flash
   temperature: 0.7
   max_tokens: 1024
+  timeout_seconds: 120   # free-tier LLM endpoints can take >30s per script
   min_words: 60
   max_words: 90
   include_cta: true
