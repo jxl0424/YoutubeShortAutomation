@@ -199,6 +199,57 @@ def test_pexels_prefers_relevance_over_resolution(tmp_path):
     assert asset.source_url == "relevant.mp4"
 
 
+def test_pexels_slug_relevance_beats_search_order(tmp_path):
+    # The first result's slug is off-topic (the "green city" failure mode);
+    # a later result matching the query words must win.
+    data = {
+        "videos": [
+            {
+                "url": "https://www.pexels.com/video/city-lit-in-green-at-night-111/",
+                "duration": 6,
+                "video_files": [{"width": 1080, "height": 1920, "link": "city.mp4"}],
+            },
+            {
+                "url": "https://www.pexels.com/video/northern-lights-glowing-over-sky-222/",
+                "duration": 9,
+                "video_files": [{"width": 1080, "height": 1920, "link": "aurora.mp4"}],
+            },
+        ]
+    }
+    provider = PexelsVisualProvider(
+        api_key="k", search=lambda q: data, download=lambda url: b"v"
+    )
+    asset = provider.fetch(_scene(0, query="northern lights glowing green"), tmp_path)
+    assert asset.source_url == "aurora.mp4"
+
+
+def test_pexels_zero_slug_overlap_keeps_search_order(tmp_path):
+    data = {
+        "videos": [
+            {
+                "url": "https://www.pexels.com/video/some-unrelated-thing-1/",
+                "video_files": [{"width": 1080, "height": 1920, "link": "first.mp4"}],
+            },
+            {
+                "url": "https://www.pexels.com/video/another-unrelated-thing-2/",
+                "video_files": [{"width": 1080, "height": 1920, "link": "second.mp4"}],
+            },
+        ]
+    }
+    provider = PexelsVisualProvider(
+        api_key="k", search=lambda q: data, download=lambda url: b"v"
+    )
+    asset = provider.fetch(_scene(0, query="volcanic eruption"), tmp_path)
+    assert asset.source_url == "first.mp4"  # previous behavior preserved
+
+
+def test_pexels_slug_tokens_strip_id_and_stopwords():
+    video = {"url": "https://www.pexels.com/video/aurora-over-the-mountains-857134/"}
+    assert PexelsVisualProvider._slug_tokens(video) == {"aurora", "mountains"}
+    assert PexelsVisualProvider._slug_tokens({"url": ""}) == set()
+    assert PexelsVisualProvider._slug_tokens({}) == set()
+
+
 def test_pexels_shortens_query_to_subject():
     q = "Shimmering green aurora over snowy mountains, with the camera panning"
     assert (

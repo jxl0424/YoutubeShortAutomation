@@ -30,7 +30,9 @@ class PexelsVisualProvider(VisualProvider):
         *,
         api_key: str,
         min_height: int = 1280,
-        per_page: int = 5,
+        # A wider page gives the slug re-ranker real candidates to find a
+        # topical match in; with 5, an off-topic first page was game over.
+        per_page: int = 15,
         timeout: float = 30.0,
         search: Callable[[str], dict[str, Any]] | None = None,
         download: Callable[[str], bytes] | None = None,
@@ -76,12 +78,17 @@ class PexelsVisualProvider(VisualProvider):
                     fh.write(chunk)
 
     # --- selection ------------------------------------------------------- #
-    def _pick(self, data: dict[str, Any]) -> tuple[str, int, int, float | None]:
-        # Pexels returns videos in relevance order, so honor that: take the
-        # first video that has a portrait file meeting the height floor (picking
-        # its largest such file). Maximizing resolution across all results
-        # instead would grab the biggest clip regardless of topical relevance.
-        for video in data.get("videos") or []:
+    def _pick(
+        self, data: dict[str, Any], query: str = ""
+    ) -> tuple[str, int, int, float | None]:
+        # Pexels search order is only roughly topical ("northern lights glowing
+        # green" can lead with a green-lit city). Each video's page URL carries
+        # a descriptive slug, so prefer the candidate whose slug shares the most
+        # content words with the query; Pexels' own order breaks ties — and
+        # decides outright when no slug overlaps (the previous behavior).
+        query_tokens = self._tokens(query)
+        candidates: list[tuple[int, int, tuple[str, int, int, float | None]]] = []
+        for order, video in enumerate(data.get("videos") or []):
             duration = video.get("duration")
             best: tuple[str, int, int, float | None] | None = None
             best_height = -1
@@ -94,9 +101,43 @@ class PexelsVisualProvider(VisualProvider):
                 portrait = height >= width and height >= self._min_height
                 if portrait and height > best_height:
                     best, best_height = (link, width, height, duration), height
-            if best is not None:
-                return best
-        raise VisualError("pexels returned no suitable portrait video")
+            if best is None:
+                continue
+            overlap = len(query_tokens & self._slug_tokens(video))
+            candidates.append((-overlap, order, best))
+        if not candidates:
+            raise VisualError("pexels returned no suitable portrait video")
+        candidates.sort(key=lambda c: (c[0], c[1]))
+        return candidates[0][2]
+
+    # Grammar words carry no topical signal in either slugs or queries.
+    _STOPWORDS: ClassVar[set[str]] = {
+        "a",
+        "an",
+        "and",
+        "at",
+        "for",
+        "in",
+        "of",
+        "on",
+        "over",
+        "the",
+        "to",
+        "with",
+    }
+
+    @classmethod
+    def _tokens(cls, text: str) -> set[str]:
+        return {
+            t for t in re.findall(r"[a-z0-9]+", text.lower()) if t not in cls._STOPWORDS
+        }
+
+    @classmethod
+    def _slug_tokens(cls, video: dict[str, Any]) -> set[str]:
+        match = re.search(r"/video/([a-z0-9-]+?)(?:-\d+)?/?$", video.get("url") or "")
+        if match is None:
+            return set()
+        return cls._tokens(match.group(1).replace("-", " "))
 
     @staticmethod
     def _search_query(query: str) -> str:
@@ -115,8 +156,9 @@ class PexelsVisualProvider(VisualProvider):
         # truncated/failed download never leaves a corrupt final asset.
         tmp = path.with_name(path.name + ".part")
         try:
-            data = self._search(self._search_query(scene.visual_query))
-            link, width, height, duration = self._pick(data)
+            search_query = self._search_query(scene.visual_query)
+            data = self._search(search_query)
+            link, width, height, duration = self._pick(data, search_query)
             self._save(link, tmp)
             if not tmp.exists() or tmp.stat().st_size == 0:
                 raise VisualError(
