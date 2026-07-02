@@ -158,6 +158,26 @@ Uploads are off by default. One-time setup (Google Cloud Console):
 The first upload opens a browser consent once, then caches a refresh token at
 `.secrets/youtube_token.json` — later runs are hands-free.
 
+## Daily scheduled run (Windows)
+
+One short per day, hands-free:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\register_schedule.ps1 -Time "09:00"
+Start-ScheduledTask -TaskName "YouTubeShortsDaily"     # optional test trigger
+```
+
+The task runs [`scripts/run_daily.ps1`](scripts/run_daily.ps1) as the current
+user (while logged on), appending output to `logs/daily-<yyyyMMdd>.log`. Notes:
+
+- **Duplicate protection**: topics generated in the last 14 days are remembered
+  in `.state/topic_history.json`; a repeat trend re-selects the next-ranked
+  alternative, and a day with nothing new is a logged no-op (exit 0). Bypass
+  with `python -m shorts --allow-repeat`.
+- **Quota**: one upload costs 1600 of the 10,000 daily YouTube API quota units.
+- Uploads stay `private` (per config) for manual review before publishing.
+- Remove with `Unregister-ScheduledTask -TaskName "YouTubeShortsDaily"`.
+
 ## Configuration
 
 Everything is configured in [`config/default.yaml`](config/default.yaml) — enabled

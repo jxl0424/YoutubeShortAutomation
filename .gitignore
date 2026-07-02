@@ -15,5 +15,6 @@ htmlcov/
 output/
 .secrets/
 .state/
+/logs/
 models/
 *TEMP_MPY_*
