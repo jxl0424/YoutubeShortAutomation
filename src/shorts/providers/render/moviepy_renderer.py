@@ -12,6 +12,7 @@ wrapped so a failing nicety never fails the core render.
 
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -24,6 +25,28 @@ from ...domain.interfaces import VideoRenderer
 from ...domain.models import RenderedVideo, RenderRequest, RenderScene, VisualType
 
 _VIDEO_TYPES = {VisualType.STOCK_VIDEO, VisualType.AI_VIDEO}
+
+# Crossfade length between scenes (clamped to half the shortest scene).
+_CROSSFADE_SECONDS = 0.3
+
+# libass renders SRT-converted subs against a 384x288 canvas and scales to the
+# output, so pixel sizes from config must be expressed in that coordinate space.
+_ASS_PLAY_RES_Y = 288
+
+_NAMED_COLORS = {
+    "white": (255, 255, 255),
+    "black": (0, 0, 0),
+    "yellow": (255, 255, 0),
+    "red": (255, 0, 0),
+    "green": (0, 255, 0),
+    "blue": (0, 0, 255),
+    "cyan": (0, 255, 255),
+    "magenta": (255, 0, 255),
+    "orange": (255, 165, 0),
+}
+
+# ASS numpad alignment + vertical margin (in PlayRes units) per position.
+_POSITIONS = {"bottom": (2, 50), "center": (5, 0), "top": (8, 30)}
 
 
 class MoviePyRenderer(VideoRenderer):
@@ -42,14 +65,29 @@ class MoviePyRenderer(VideoRenderer):
             opened.append(audio)
             total = audio.duration
 
-            clips = [self._scene_clip(s, request, opened) for s in request.scenes]
-            if not clips:
+            if not request.scenes:
                 raise RenderError("no scenes to render")
+            fade = self._fade_seconds(request)
+            # Crossfading overlaps scene boundaries, so every clip except the
+            # last carries `fade` extra seconds of content to fade over —
+            # scene start times (and narration/caption sync) stay untouched.
+            clips = [
+                self._scene_clip(
+                    s,
+                    request,
+                    opened,
+                    extra=fade if i < len(request.scenes) - 1 else 0.0,
+                )
+                for i, s in enumerate(request.scenes)
+            ]
             # Derived/composite clips hold their own reader handles; track them
             # alongside the file-opened clips so the finally block closes all.
             opened.extend(clips)
 
-            video = concatenate_videoclips(clips, method="compose")
+            if fade:
+                video = self._crossfade(clips, request, fade)
+            else:
+                video = concatenate_videoclips(clips, method="compose")
             opened.append(video)
             duration = min(video.duration, total)
             video = video.subclipped(0, duration)
@@ -94,12 +132,24 @@ class MoviePyRenderer(VideoRenderer):
         )
 
     # --- scene clips ----------------------------------------------------- #
+    @staticmethod
+    def _fade_seconds(request: RenderRequest) -> float:
+        if not request.transitions or len(request.scenes) < 2:
+            return 0.0
+        shortest = min(s.duration_seconds for s in request.scenes)
+        return min(_CROSSFADE_SECONDS, shortest / 2)
+
     def _scene_clip(
-        self, scene: RenderScene, request: RenderRequest, opened: list[Any]
+        self,
+        scene: RenderScene,
+        request: RenderRequest,
+        opened: list[Any],
+        extra: float = 0.0,
     ) -> Any:
         from moviepy import VideoFileClip
 
-        w, h, d = request.width, request.height, scene.duration_seconds
+        w, h = request.width, request.height
+        d = scene.duration_seconds + extra
         if scene.visual_type in _VIDEO_TYPES:
             clip = VideoFileClip(str(scene.asset_path)).without_audio()
             opened.append(clip)
@@ -110,6 +160,29 @@ class MoviePyRenderer(VideoRenderer):
         if not request.ken_burns:
             return base
         return self._ken_burns(base, w, h, d)
+
+    def _crossfade(self, clips: list[Any], request: RenderRequest, fade: float) -> Any:
+        """Composite scene clips at their planned start times with crossfades."""
+        try:
+            from moviepy import CompositeVideoClip, vfx
+
+            placed, start = [], 0.0
+            for i, (clip, scene) in enumerate(zip(clips, request.scenes, strict=True)):
+                clip = clip.with_start(start)
+                if i > 0:
+                    clip = clip.with_effects([vfx.CrossFadeIn(fade)])
+                placed.append(clip)
+                start += scene.duration_seconds
+            return CompositeVideoClip(
+                placed, size=(request.width, request.height)
+            ).with_duration(start)
+        except Exception as exc:
+            # Fallback concatenates the padded clips (slightly long; render()
+            # trims to the narration), so a failed nicety never fails the run.
+            self._logger.warning("crossfade_failed", error=str(exc))
+            from moviepy import concatenate_videoclips
+
+            return concatenate_videoclips(clips, method="compose")
 
     def _still_clip(self, path: Path, w: int, h: int, d: float) -> Any:
         from moviepy import ImageClip
@@ -196,6 +269,37 @@ class MoviePyRenderer(VideoRenderer):
             return narration
 
     # --- finalize (burn subtitles or move raw into place) ---------------- #
+    def _force_style(self, request: RenderRequest) -> str:
+        """Map the semantic subtitle style to an ASS force_style override."""
+        # Bold text with a solid outline is the standard Shorts caption look;
+        # these aren't configurable, they just make any font/color readable.
+        parts = [f"FontName={request.subtitle_font}", "Bold=1", "Outline=1.5"]
+        size = round(request.subtitle_font_size * _ASS_PLAY_RES_Y / request.height)
+        parts.append(f"FontSize={max(size, 1)}")
+        color = self._ass_color(request.subtitle_color)
+        if color:
+            parts.append(f"PrimaryColour={color}")
+        position = _POSITIONS.get(request.subtitle_position.strip().lower())
+        if position:
+            alignment, margin_v = position
+            parts.append(f"Alignment={alignment}")
+            if margin_v:
+                parts.append(f"MarginV={margin_v}")
+        return ",".join(parts)
+
+    @staticmethod
+    def _ass_color(color: str) -> str | None:
+        """Convert a color name or #RRGGBB to ASS &H00BBGGRR (BGR order)."""
+        normalized = color.strip().lower()
+        rgb = _NAMED_COLORS.get(normalized)
+        if rgb is None and re.fullmatch(r"#?[0-9a-f]{6}", normalized):
+            hex_value = normalized.lstrip("#")
+            rgb = tuple(int(hex_value[i : i + 2], 16) for i in (0, 2, 4))
+        if rgb is None:
+            return None
+        r, g, b = rgb
+        return f"&H00{b:02X}{g:02X}{r:02X}"
+
     def _finalize(self, raw_path: Path, request: RenderRequest) -> None:
         subtitle = request.subtitle_path
         if not (request.burn_subtitles and subtitle and Path(subtitle).exists()):
@@ -216,6 +320,7 @@ class MoviePyRenderer(VideoRenderer):
             # (avoids Windows path-escaping issues in the subtitles filter). The
             # in/out video paths must be absolute since cwd changes underneath us.
             subtitle_path = Path(subtitle)
+            style = self._force_style(request)
             subprocess.run(
                 [
                     ffmpeg,
@@ -223,7 +328,7 @@ class MoviePyRenderer(VideoRenderer):
                     "-i",
                     str(raw_path.resolve()),
                     "-vf",
-                    f"subtitles={subtitle_path.name}",
+                    f"subtitles={subtitle_path.name}:force_style='{style}'",
                     *quality,
                     "-c:a",
                     "copy",

@@ -10,16 +10,16 @@ enrichment:
   max_facts: 5
 
 script:
-  provider: gemini_flash
-  fallback_providers: [groq, openrouter, nvidia_nim]
-  model: gemini-2.0-flash
+  provider: nvidia_nim
+  fallback_providers: []
+  model: meta/llama-3.1-70b-instruct
   temperature: 0.7
   max_tokens: 1024
   timeout_seconds: 120   # free-tier LLM endpoints can take >30s per script
   min_words: 60
   max_words: 90
   include_cta: true
-  api_key_env: GEMINI_API_KEY
+  api_key_env: NVIDIA_API_KEY
 
 metadata:
   max_title_length: 100
@@ -71,12 +71,14 @@ video:
   subtitles:
     enabled: true
     font: Arial
-    font_size: 48
-    color: white
-    position: bottom
+    font_size: 96        # output-video pixels (96 ≈ 5% of frame height)
+    color: white         # common name or #RRGGBB
+    position: bottom     # bottom | center | top
   music:
-    enabled: false
-    path: null
+    enabled: true
+    # CC0 lo-fi loop shipped with the repo (see assets/music/README.md).
+    # Relative paths resolve against the project root.
+    path: assets/music/lofi-bubbles.mp3
     volume: 0.15
 
 thumbnail:

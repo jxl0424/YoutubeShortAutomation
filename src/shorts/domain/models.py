@@ -168,6 +168,12 @@ class RenderRequest(_Model):
     ken_burns: bool = True
     transitions: bool = True
     burn_subtitles: bool = True
+    # Subtitle styling, renderer-agnostic: size is in output-video pixels,
+    # color is a common name or #RRGGBB, position is bottom | center | top.
+    subtitle_font: str = "Arial"
+    subtitle_font_size: int = Field(default=96, gt=0)
+    subtitle_color: str = "white"
+    subtitle_position: str = "bottom"
     music_path: Path | None = None
     music_volume: float = Field(default=0.15, ge=0.0, le=1.0)
 

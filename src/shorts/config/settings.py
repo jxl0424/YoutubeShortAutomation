@@ -109,9 +109,10 @@ class ValidationConfig(_Section):
 class SubtitleConfig(_Section):
     enabled: bool = True
     font: str = "Arial"
-    font_size: int = Field(default=48, ge=1)
-    color: str = "white"
-    position: str = "bottom"
+    # In output-video pixels (96 ≈ 5% of a 1920-tall frame — Shorts-sized).
+    font_size: int = Field(default=96, ge=1)
+    color: str = "white"  # common name or #RRGGBB
+    position: str = "bottom"  # bottom | center | top
 
 
 class MusicConfig(_Section):

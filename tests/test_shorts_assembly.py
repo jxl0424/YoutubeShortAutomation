@@ -136,3 +136,29 @@ def test_music_wired_when_enabled(tmp_path):
     ctx.config.video.music.path = str(tmp_path / "bg.mp3")
     VideoAssembler(renderer).run(ctx)
     assert renderer.request.music_path == tmp_path / "bg.mp3"
+
+
+def test_relative_music_path_resolves_against_project_root(tmp_path):
+    from shorts.config.settings import PROJECT_ROOT
+
+    renderer = FakeRenderer()
+    ctx = _ctx(tmp_path)
+    ctx.config.video.music.enabled = True
+    ctx.config.video.music.path = "assets/music/bed.mp3"
+    VideoAssembler(renderer).run(ctx)
+    assert renderer.request.music_path == PROJECT_ROOT / "assets/music/bed.mp3"
+
+
+def test_subtitle_style_forwarded_from_config(tmp_path):
+    renderer = FakeRenderer()
+    ctx = _ctx(tmp_path)
+    subs = ctx.config.video.subtitles
+    subs.font, subs.font_size = "Verdana", 80
+    subs.color, subs.position = "#ffcc00", "top"
+    VideoAssembler(renderer).run(ctx)
+
+    req = renderer.request
+    assert req.subtitle_font == "Verdana"
+    assert req.subtitle_font_size == 80
+    assert req.subtitle_color == "#ffcc00"
+    assert req.subtitle_position == "top"

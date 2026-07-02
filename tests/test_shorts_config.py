@@ -11,7 +11,7 @@ from shorts.domain.models import VisualType
 
 def test_load_default_config():
     config = ShortsConfig.load(load_env=False)
-    assert config.script.provider == "gemini_flash"
+    assert config.script.provider == "nvidia_nim"
     assert config.voice.provider == "kokoro"
     assert config.voice.voice == "af_heart"
     assert config.video.width == 1080
@@ -28,10 +28,12 @@ def test_defaults_without_yaml():
 
 
 def test_secrets_resolved_from_env(monkeypatch):
-    monkeypatch.setenv("GEMINI_API_KEY", "gem-123")
+    # Pin every env var the config reads, so a real key in the developer's
+    # environment can never leak into an assertion diff.
+    monkeypatch.setenv("NVIDIA_API_KEY", "nv-123")
     monkeypatch.setenv("PEXELS_API_KEY", "pex-456")
     config = ShortsConfig.load(load_env=False)
-    assert config.script.api_key == "gem-123"
+    assert config.script.api_key == "nv-123"
     assert config.assets.stock.pexels_api_key == "pex-456"
 
 

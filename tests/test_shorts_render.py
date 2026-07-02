@@ -13,7 +13,7 @@ import sys
 import types
 from pathlib import Path
 
-from shorts.domain.models import RenderRequest
+from shorts.domain.models import RenderRequest, RenderScene, VisualType
 from shorts.providers.render.moviepy_renderer import MoviePyRenderer
 
 
@@ -87,7 +87,8 @@ def test_finalize_burn_mirrors_configured_bitrate(tmp_path, monkeypatch):
     # The re-encode must carry the configured quality target, not ffmpeg defaults.
     assert "-b:v" in cmd and "8M" in cmd
     assert "-c:v" in cmd and "libx264" in cmd
-    assert "subtitles=captions.srt" in cmd
+    vf = cmd[cmd.index("-vf") + 1]
+    assert vf.startswith("subtitles=captions.srt:force_style='")
     assert not raw.exists()  # raw removed after a successful burn
 
 
@@ -106,6 +107,34 @@ def test_finalize_without_subtitles_moves_raw_into_place(tmp_path, monkeypatch):
     assert not raw.exists()
 
 
+def test_force_style_maps_semantic_fields_to_ass(tmp_path):
+    request = _request(
+        tmp_path,
+        subtitle_font="Verdana",
+        subtitle_font_size=96,  # 96px at height 1920 -> 14.4 -> 14 ASS units
+        subtitle_color="yellow",
+        subtitle_position="top",
+    )
+    style = MoviePyRenderer()._force_style(request)
+    assert "FontName=Verdana" in style
+    assert "FontSize=14" in style
+    assert "PrimaryColour=&H0000FFFF" in style  # yellow RGB -> ASS BGR
+    assert "Alignment=8" in style  # top
+    assert "Bold=1" in style and "Outline=1.5" in style
+
+
+def test_force_style_bottom_position_keeps_clear_of_shorts_ui(tmp_path):
+    style = MoviePyRenderer()._force_style(_request(tmp_path))
+    assert "Alignment=2" in style
+    assert "MarginV=50" in style
+
+
+def test_ass_color_accepts_hex_and_rejects_unknown():
+    assert MoviePyRenderer._ass_color("#ff8800") == "&H000088FF"
+    assert MoviePyRenderer._ass_color("white") == "&H00FFFFFF"
+    assert MoviePyRenderer._ass_color("not-a-color") is None
+
+
 def test_finalize_burn_failure_falls_back_to_raw_video(tmp_path, monkeypatch):
     raw = tmp_path / "render_raw.mp4"
     raw.write_bytes(b"raw-video")
@@ -121,3 +150,55 @@ def test_finalize_burn_failure_falls_back_to_raw_video(tmp_path, monkeypatch):
     # The un-captioned raw video still ships (soft-sub SRT is packaged anyway).
     assert request.output_path.read_bytes() == b"raw-video"
     assert not raw.exists()
+
+
+# --- transitions (crossfade) ------------------------------------------------- #
+def _scene(seconds):
+    return RenderScene(
+        asset_path=Path("x.jpg"),
+        visual_type=VisualType.GENERATED_IMAGE,
+        duration_seconds=seconds,
+    )
+
+
+def test_fade_seconds_zero_when_transitions_off(tmp_path):
+    request = _request(tmp_path, transitions=False, scenes=[_scene(3), _scene(3)])
+    assert MoviePyRenderer._fade_seconds(request) == 0.0
+
+
+def test_fade_seconds_zero_for_single_scene(tmp_path):
+    request = _request(tmp_path, scenes=[_scene(3)])
+    assert MoviePyRenderer._fade_seconds(request) == 0.0
+
+
+def test_fade_seconds_clamped_to_half_shortest_scene(tmp_path):
+    request = _request(tmp_path, scenes=[_scene(3.0), _scene(0.4)])
+    assert MoviePyRenderer._fade_seconds(request) == 0.2
+    request = _request(tmp_path, scenes=[_scene(3.0), _scene(4.0)])
+    assert MoviePyRenderer._fade_seconds(request) == 0.3
+
+
+def test_crossfade_preserves_scene_start_times_and_total(tmp_path):
+    # Real (tiny) MoviePy clips: two 1s scenes + 0.2s fade. The composite must
+    # keep the planned timeline (start at 0 and 1, total 2) — narration and
+    # caption sync depend on it.
+    import numpy as np
+    from moviepy import ImageClip
+
+    fade = 0.2
+    first = ImageClip(np.full((64, 32, 3), 255, dtype=np.uint8)).with_duration(
+        1.0 + fade
+    )
+    second = ImageClip(np.zeros((64, 32, 3), dtype=np.uint8)).with_duration(1.0)
+    request = _request(tmp_path, width=32, height=64, scenes=[_scene(1.0), _scene(1.0)])
+
+    video = MoviePyRenderer()._crossfade([first, second], request, fade)
+
+    assert video.duration == 2.0
+    # Mid-crossfade (t=1.1) the black clip is fading in over the white clip:
+    # the frame must be a grey blend, proving both clips are visible.
+    mid = video.get_frame(1.1).mean()
+    assert 40 < mid < 220
+    # Well past the fade the second (black) scene fully owns the frame.
+    assert video.get_frame(1.8).mean() < 5
+    assert video.get_frame(0.5).mean() > 250

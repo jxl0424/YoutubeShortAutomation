@@ -48,6 +48,7 @@ class VideoAssembler(PipelineStage):
             )
 
         music = ctx.config.video.music
+        subtitles = video_cfg.subtitles
         request = RenderRequest(
             output_path=ctx.work_dir / "video.mp4",
             width=video_cfg.width,
@@ -59,8 +60,12 @@ class VideoAssembler(PipelineStage):
             subtitle_path=ctx.voice.subtitle_path,
             ken_burns=video_cfg.ken_burns,
             transitions=video_cfg.transitions,
-            burn_subtitles=video_cfg.subtitles.enabled,
-            music_path=Path(music.path) if music.enabled and music.path else None,
+            burn_subtitles=subtitles.enabled,
+            subtitle_font=subtitles.font,
+            subtitle_font_size=subtitles.font_size,
+            subtitle_color=subtitles.color,
+            subtitle_position=subtitles.position,
+            music_path=self._music_path(music),
             music_volume=music.volume,
         )
 
@@ -73,3 +78,15 @@ class VideoAssembler(PipelineStage):
             path=str(rendered.path),
             duration=rendered.duration_seconds,
         )
+
+    @staticmethod
+    def _music_path(music) -> Path | None:
+        """Resolve the configured music track (relative paths = project root)."""
+        if not (music.enabled and music.path):
+            return None
+        path = Path(music.path)
+        if not path.is_absolute():
+            from ..config.settings import PROJECT_ROOT
+
+            path = PROJECT_ROOT / path
+        return path

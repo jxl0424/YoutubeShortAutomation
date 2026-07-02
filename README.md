@@ -82,6 +82,11 @@ package = pipeline.generate(selected_topic)   # -> output/<slug>/ with video.mp4
 Output folder: `video.mp4`, `thumbnail.png`, `captions.srt`, `metadata.json`,
 `description.txt`, `tags.txt`, `script.txt`, `assets/`, `logs/`.
 
+Presentation is config-driven (`config/shorts.yaml` → `video:`): burned-caption
+styling (`subtitles.font/font_size/color/position`), 0.3s crossfades between
+scenes (`transitions`), and a CC0 lo-fi music bed mixed under the narration at
+low volume (`music`, track shipped in `assets/music/`).
+
 ## Setup
 
 ```bash
