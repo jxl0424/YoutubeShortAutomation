@@ -49,16 +49,32 @@ class PillowThumbnailRenderer(ThumbnailRenderer):
         return ThumbnailResult(path=request.output_path, width=w, height=h)
 
     # --- background ------------------------------------------------------ #
+    _VIDEO_SUFFIXES: ClassVar[set[str]] = {".mp4", ".mov", ".webm", ".mkv"}
+
     def _background(self, request: ThumbnailRequest, w: int, h: int) -> Any:
         from PIL import Image
 
         if request.background_path and Path(request.background_path).exists():
             try:
-                bg = Image.open(request.background_path).convert("RGB")
+                bg = self._open_background(Path(request.background_path))
                 return self._cover(bg, w, h)
             except Exception as exc:
                 self._logger.warning("thumbnail_background_failed", error=str(exc))
         return Image.new("RGB", (w, h), (20, 24, 40))
+
+    def _open_background(self, path: Path) -> Any:
+        from PIL import Image
+
+        # Stock-video scenes are the default asset type, so the background is
+        # usually an mp4 — grab a mid-clip frame instead of failing to the
+        # solid fill (which is what every thumbnail silently did before).
+        if path.suffix.lower() in self._VIDEO_SUFFIXES:
+            from moviepy import VideoFileClip
+
+            with VideoFileClip(str(path)) as clip:
+                frame = clip.get_frame(min(1.0, clip.duration / 2))
+            return Image.fromarray(frame)
+        return Image.open(path).convert("RGB")
 
     @staticmethod
     def _cover(image: Any, w: int, h: int) -> Any:
@@ -82,16 +98,22 @@ class PillowThumbnailRenderer(ThumbnailRenderer):
         except TypeError:  # Pillow < 10.1 has no size arg
             return ImageFont.load_default()
 
+    # Bright accent strip above the title band — the classic thumbnail cue that
+    # makes the text block read as designed rather than auto-generated.
+    _ACCENT = (255, 196, 0, 255)
+
     def _draw_title(self, draw: Any, title: str, w: int, h: int) -> None:
-        font_size = max(36, w // 12)
+        font_size = max(48, w // 8)  # thumbnail-scale type (~135px at 1080w)
         font = self._font(font_size)
         lines = self._wrap(draw, title.upper(), font, w - w // 8)
-        line_height = font_size + 14
+        line_height = int(font_size * 1.12)
         block_height = line_height * len(lines)
-        top = int(h * 0.60)
+        top = int(h * 0.55)  # higher band leaves room for the larger type
 
-        draw.rectangle([0, top - 24, w, top + block_height + 24], fill=(0, 0, 0, 150))
-        stroke = max(2, font_size // 18)
+        accent_height = max(6, h // 160)
+        draw.rectangle([0, top - 24 - accent_height, w, top - 24], fill=self._ACCENT)
+        draw.rectangle([0, top - 24, w, top + block_height + 24], fill=(0, 0, 0, 170))
+        stroke = max(3, font_size // 14)
         for i, line in enumerate(lines):
             text_width = draw.textlength(line, font=font)
             x = (w - text_width) // 2

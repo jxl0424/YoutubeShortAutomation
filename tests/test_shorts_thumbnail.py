@@ -69,6 +69,26 @@ def test_missing_background_falls_back_to_solid(tmp_path):
     assert result.path.exists()
 
 
+def test_video_background_uses_a_real_frame(tmp_path):
+    # Stock-video runs pass an mp4 as the background; a mid-clip frame must be
+    # used rather than the solid fallback fill.
+    import numpy as np
+    from moviepy import ImageClip
+
+    video = tmp_path / "scene.mp4"
+    red = ImageClip(np.full((112, 64, 3), (200, 30, 30), dtype=np.uint8))
+    red.with_duration(0.4).write_videofile(
+        str(video), fps=5, codec="libx264", audio=False, logger=None
+    )
+
+    result = PillowThumbnailRenderer().render(
+        _request(tmp_path, background_path=video, title_overlay=False)
+    )
+    with Image.open(result.path) as img:
+        r, g, b = img.convert("RGB").getpixel((W // 2, 10))
+    assert r > 120 and g < 90 and b < 90  # red frame, not the navy fallback
+
+
 # --- stage ----------------------------------------------------------------- #
 class FakeThumbRenderer(ThumbnailRenderer):
     name: ClassVar[str] = "fake"
