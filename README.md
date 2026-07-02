@@ -140,6 +140,24 @@ YOUTUBE_API_KEY=your-key-here
 It activates automatically on the next run — no code or config change needed
 (`videos.list?chart=mostPopular`, 1 quota unit/call).
 
+## Enabling YouTube upload (Stage 2)
+
+Uploads are off by default. One-time setup (Google Cloud Console):
+
+1. Create a project, then **enable "YouTube Data API v3"** in it (APIs & Services
+   → Library). Skipping this yields `403 accessNotConfigured` at upload time.
+2. OAuth consent screen: External; **add your own Google account under Test
+   users** (Audience tab), or consent fails with `403 access_denied` while the
+   app is in Testing status. Add the `youtube.upload` scope (Data Access tab).
+3. Credentials → Create OAuth client ID → **Desktop app** → download the JSON to
+   `.secrets/client_secrets.json` (gitignored) and set in `.env`:
+   `YOUTUBE_CLIENT_SECRETS=.secrets/client_secrets.json`.
+4. `pip install -e ".[youtube]"` and set `upload.enabled: true` in
+   `config/shorts.yaml` (`privacy: private` is the safe default).
+
+The first upload opens a browser consent once, then caches a refresh token at
+`.secrets/youtube_token.json` — later runs are hands-free.
+
 ## Configuration
 
 Everything is configured in [`config/default.yaml`](config/default.yaml) — enabled
