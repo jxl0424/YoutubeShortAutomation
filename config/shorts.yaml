@@ -6,8 +6,8 @@
 language: en
 
 enrichment:
-  enabled: false        # optional lightweight research before script generation
-  max_facts: 5
+  enabled: true         # fetch recent headlines (Google News RSS, keyless) to
+  max_facts: 5          # ground the script; skipped silently on any failure
 
 script:
   provider: nvidia_nim
@@ -16,8 +16,10 @@ script:
   temperature: 0.7
   max_tokens: 1024
   timeout_seconds: 120   # free-tier LLM endpoints can take >30s per script
-  min_words: 60
-  max_words: 90
+  # The LLM picks the script length inside this band based on content depth
+  # (biased short); at ~2.5 words/sec this spans roughly 15-65 seconds.
+  min_words: 40
+  max_words: 160
   include_cta: true
   api_key_env: NVIDIA_API_KEY
 

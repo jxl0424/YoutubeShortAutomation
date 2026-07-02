@@ -43,8 +43,9 @@ class ScriptConfig(_Section):
     # Free-tier endpoints (e.g. NVIDIA NIM llama-70b) can take >30s to produce a
     # full script, so this is deliberately generous.
     timeout_seconds: float = Field(default=120.0, gt=0)
-    min_words: int = Field(default=60, ge=1)
-    max_words: int = Field(default=90, ge=1)
+    # Bounds for the LLM's own length choice (content-driven, biased short).
+    min_words: int = Field(default=40, ge=1)
+    max_words: int = Field(default=160, ge=1)
     include_cta: bool = True
     api_key_env: str = "GEMINI_API_KEY"
     api_key: str | None = None

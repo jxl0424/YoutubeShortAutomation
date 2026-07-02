@@ -2,6 +2,7 @@
 
 from .assembly import VideoAssembler
 from .assets import AssetCollector
+from .enrichment import TopicEnricher
 from .metadata import MetadataGenerator
 from .packaging import Packager
 from .script import ScriptGenerator
@@ -18,6 +19,7 @@ __all__ = [
     "Packager",
     "ScriptGenerator",
     "ThumbnailGenerator",
+    "TopicEnricher",
     "Uploader",
     "VideoAssembler",
     "VisualPlanner",

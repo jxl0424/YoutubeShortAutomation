@@ -130,9 +130,9 @@ def build_pipeline(
 ) -> ShortsPipeline:
     """Wire every stage from configuration (optional injection for testing).
 
-    Stages self-gate where optional: thumbnail and upload skip themselves when
-    disabled, so the pipeline runs end-to-end with uploads off out of the box.
-    (Topic enrichment is optional and not yet implemented; it slots in here.)
+    Stages self-gate where optional: enrichment, thumbnail and upload skip
+    themselves when disabled/unconfigured, so the pipeline runs end-to-end out
+    of the box.
     """
     from .providers.llm import build_script_llm
     from .providers.render import build_renderer
@@ -148,6 +148,7 @@ def build_pipeline(
         Packager,
         ScriptGenerator,
         ThumbnailGenerator,
+        TopicEnricher,
         Uploader,
         VideoAssembler,
         VisualPlanner,
@@ -172,6 +173,7 @@ def build_pipeline(
     uploader = upload_provider or build_upload_provider(config.upload)
 
     stages: list[PipelineStage] = [
+        TopicEnricher(timeout=config.http.timeout_seconds),
         ScriptGenerator(llm),
         MetadataGenerator(llm),
         VoiceGenerator(voice),

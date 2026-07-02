@@ -53,13 +53,20 @@ def build_system_prompt(config: ScriptConfig) -> str:
         else "- Do not include a call-to-action; set `cta` to null."
     )
     return f"""\
-You are a viral short-form scriptwriter for YouTube Shorts (vertical, ~30-60s).
+You are a viral short-form scriptwriter for YouTube Shorts (vertical video).
 Write a tight, high-retention script from the given topic brief.
 
 Requirements:
 - A scroll-stopping `hook` (one punchy sentence).
-- `narration`: {config.min_words}-{config.max_words} words total, conversational and energetic.
-- Split the narration into 3-6 `scenes`. For each scene provide:
+- `narration`: conversational and energetic. Choose the length yourself, between
+  {config.min_words} and {config.max_words} words, based on how much genuine
+  material the brief (and `research`, when present) supports. Every sentence
+  must deliver a new fact or payoff — never pad. A thin topic deserves a short,
+  punchy script; only go long when the material is rich.
+- When `research` facts are provided, ground the narration in them and do not
+  invent specifics beyond the brief and research.
+- Split the narration into `scenes` of roughly 20-25 spoken words each. For
+  each scene provide:
   - `narration`: that scene's spoken segment,
   - `on_screen_text`: a very short caption (a few words),
   - `visual_instruction`: a SHORT real-world subject to film, 2-5 words, leading

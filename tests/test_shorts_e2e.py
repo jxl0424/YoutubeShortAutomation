@@ -200,6 +200,7 @@ def test_build_pipeline_wires_all_stages():
     )
     names = [s.name for s in pipeline._stages]
     assert names == [
+        "topic_enrichment",
         "script_generation",
         "metadata_generation",
         "voice_generation",

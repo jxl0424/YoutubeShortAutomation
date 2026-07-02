@@ -12,6 +12,8 @@ from shorts.domain.models import VisualType
 def test_load_default_config():
     config = ShortsConfig.load(load_env=False)
     assert config.script.provider == "nvidia_nim"
+    assert config.enrichment.enabled is True
+    assert (config.script.min_words, config.script.max_words) == (40, 160)
     assert config.voice.provider == "kokoro"
     assert config.voice.voice == "af_heart"
     assert config.video.width == 1080
