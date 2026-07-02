@@ -18,6 +18,7 @@ def test_load_default_config():
     assert config.voice.voice == "af_heart"
     assert config.video.width == 1080
     assert config.video.height == 1920
+    assert config.video.scene_text is True
     # Shipped config has uploads ON; the Uploader stage still skips itself
     # (with a warning) on machines without OAuth credentials configured.
     assert config.upload.enabled is True

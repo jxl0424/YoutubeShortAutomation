@@ -202,3 +202,46 @@ def test_crossfade_preserves_scene_start_times_and_total(tmp_path):
     # Well past the fade the second (black) scene fully owns the frame.
     assert video.get_frame(1.8).mean() < 5
     assert video.get_frame(0.5).mean() > 250
+
+
+# --- scene-text overlays ------------------------------------------------------ #
+def _text_scene(seconds, text):
+    return RenderScene(
+        asset_path=Path("x.jpg"),
+        visual_type=VisualType.GENERATED_IMAGE,
+        duration_seconds=seconds,
+        on_screen_text=text,
+    )
+
+
+def test_text_overlays_timed_per_scene(tmp_path):
+    request = _request(
+        tmp_path,
+        scenes=[
+            _text_scene(2.0, "First fact"),
+            _text_scene(3.0, None),  # no text -> no overlay
+            _text_scene(1.5, "  "),  # blank -> no overlay
+            _text_scene(1.5, "Third point"),
+        ],
+    )
+    overlays = MoviePyRenderer()._text_overlays(request)
+    assert len(overlays) == 2
+    assert [c.start for c in overlays] == [0.0, 6.5]
+    assert [c.duration for c in overlays] == [2.0, 1.5]
+
+
+def test_text_overlay_pixels_appear_in_top_region(tmp_path):
+    import numpy as np
+    from moviepy import CompositeVideoClip, ImageClip
+
+    w, h = 64, 112
+    base = ImageClip(np.zeros((h, w, 3), dtype=np.uint8)).with_duration(1.0)
+    request = _request(tmp_path, width=w, height=h, scenes=[_text_scene(1.0, "HI")])
+
+    overlays = MoviePyRenderer()._text_overlays(request)
+    video = CompositeVideoClip([base, *overlays], size=(w, h))
+    frame = video.get_frame(0.5)
+
+    top, bottom = frame[: h // 2], frame[h // 2 :]
+    assert top.max() > 200  # white text (with black stroke) landed up top
+    assert bottom.max() < 50  # bottom half untouched

@@ -89,6 +89,24 @@ class MoviePyRenderer(VideoRenderer):
             else:
                 video = concatenate_videoclips(clips, method="compose")
             opened.append(video)
+
+            if request.scene_text:
+                # Best-effort like Ken Burns/music: a failed overlay never
+                # fails the render.
+                try:
+                    overlays = self._text_overlays(request)
+                    if overlays:
+                        from moviepy import CompositeVideoClip
+
+                        opened.extend(overlays)
+                        video = CompositeVideoClip(
+                            [video, *overlays],
+                            size=(request.width, request.height),
+                        )
+                        opened.append(video)
+                except Exception as exc:
+                    self._logger.warning("scene_text_failed", error=str(exc))
+
             duration = min(video.duration, total)
             video = video.subclipped(0, duration)
             opened.append(video)
@@ -183,6 +201,56 @@ class MoviePyRenderer(VideoRenderer):
             from moviepy import concatenate_videoclips
 
             return concatenate_videoclips(clips, method="compose")
+
+    # --- scene-text overlays ---------------------------------------------- #
+    def _text_overlays(self, request: RenderRequest) -> list[Any]:
+        """One timed transparent text strip per scene with on_screen_text."""
+        overlays: list[Any] = []
+        start = 0.0
+        for scene in request.scenes:
+            text = (scene.on_screen_text or "").strip()
+            if text:
+                clip = self._text_clip(text, request)
+                overlays.append(
+                    clip.with_start(start).with_duration(scene.duration_seconds)
+                )
+            start += scene.duration_seconds
+        return overlays
+
+    def _text_clip(self, text: str, request: RenderRequest) -> Any:
+        import numpy as np
+        from moviepy import ImageClip
+        from PIL import Image, ImageDraw
+
+        from ..fonts import load_bold_font, wrap_text
+
+        w = request.width
+        font_size = max(32, w // 15)  # ~72px at 1080w
+        font = load_bold_font(font_size)
+        stroke = max(2, font_size // 12)
+
+        probe = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
+        lines = wrap_text(probe, text.upper(), font, int(w * 0.9))[:2]
+        line_height = int(font_size * 1.15)
+
+        strip = Image.new(
+            "RGBA", (w, line_height * len(lines) + stroke * 2 + 8), (0, 0, 0, 0)
+        )
+        draw = ImageDraw.Draw(strip)
+        for i, line in enumerate(lines):
+            text_width = draw.textlength(line, font=font)
+            draw.text(
+                ((w - text_width) // 2, stroke + i * line_height),
+                line,
+                font=font,
+                fill=(255, 255, 255, 255),
+                stroke_width=stroke,
+                stroke_fill=(0, 0, 0, 255),
+            )
+        # Top-center (~14% down): clear of the subject center and the burned
+        # narration captions at the bottom.
+        clip = ImageClip(np.asarray(strip), transparent=True)
+        return clip.with_position((0, int(request.height * 0.14)))
 
     def _still_clip(self, path: Path, w: int, h: int, d: float) -> Any:
         from moviepy import ImageClip

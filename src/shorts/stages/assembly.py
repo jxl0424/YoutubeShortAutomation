@@ -60,6 +60,7 @@ class VideoAssembler(PipelineStage):
             subtitle_path=ctx.voice.subtitle_path,
             ken_burns=video_cfg.ken_burns,
             transitions=video_cfg.transitions,
+            scene_text=video_cfg.scene_text,
             burn_subtitles=subtitles.enabled,
             subtitle_font=subtitles.font,
             subtitle_font_size=subtitles.font_size,

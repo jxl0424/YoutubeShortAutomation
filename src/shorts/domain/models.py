@@ -168,6 +168,9 @@ class RenderRequest(_Model):
     ken_burns: bool = True
     transitions: bool = True
     burn_subtitles: bool = True
+    # Big per-scene keyword overlays rendered from RenderScene.on_screen_text
+    # (distinct from the bottom narration captions).
+    scene_text: bool = True
     # Subtitle styling, renderer-agnostic: size is in output-video pixels,
     # color is a common name or #RRGGBB, position is bottom | center | top.
     subtitle_font: str = "Arial"

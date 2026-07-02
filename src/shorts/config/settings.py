@@ -128,6 +128,8 @@ class VideoConfig(_Section):
     bitrate: str = "8M"
     ken_burns: bool = True
     transitions: bool = True
+    # Per-scene keyword overlays from the script's on_screen_text.
+    scene_text: bool = True
     template: str = "default"
     subtitles: SubtitleConfig = Field(default_factory=SubtitleConfig)
     music: MusicConfig = Field(default_factory=MusicConfig)

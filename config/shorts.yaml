@@ -66,6 +66,7 @@ video:
   bitrate: 8M
   ken_burns: true
   transitions: true
+  scene_text: true     # big per-scene keyword overlays (script's on_screen_text)
   template: default
   subtitles:
     enabled: true

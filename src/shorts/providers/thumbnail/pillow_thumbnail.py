@@ -15,13 +15,7 @@ from trend_intelligence.logging.setup import get_logger
 
 from ...domain.interfaces import ThumbnailRenderer
 from ...domain.models import ThumbnailRequest, ThumbnailResult
-
-_FONT_CANDIDATES = (
-    "C:/Windows/Fonts/arialbd.ttf",
-    "C:/Windows/Fonts/Arial.ttf",
-    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-    "DejaVuSans-Bold.ttf",
-)
+from ..fonts import load_bold_font, wrap_text
 
 
 class PillowThumbnailRenderer(ThumbnailRenderer):
@@ -86,17 +80,7 @@ class PillowThumbnailRenderer(ThumbnailRenderer):
 
     # --- text ------------------------------------------------------------ #
     def _font(self, size: int) -> Any:
-        from PIL import ImageFont
-
-        for path in _FONT_CANDIDATES:
-            try:
-                return ImageFont.truetype(path, size)
-            except Exception:
-                continue
-        try:
-            return ImageFont.load_default(size=size)
-        except TypeError:  # Pillow < 10.1 has no size arg
-            return ImageFont.load_default()
+        return load_bold_font(size)
 
     # Bright accent strip above the title band — the classic thumbnail cue that
     # makes the text block read as designed rather than auto-generated.
@@ -128,19 +112,7 @@ class PillowThumbnailRenderer(ThumbnailRenderer):
 
     @staticmethod
     def _wrap(draw: Any, text: str, font: Any, max_width: int) -> list[str]:
-        lines: list[str] = []
-        current = ""
-        for word in text.split():
-            candidate = f"{current} {word}".strip()
-            if draw.textlength(candidate, font=font) <= max_width:
-                current = candidate
-            else:
-                if current:
-                    lines.append(current)
-                current = word
-        if current:
-            lines.append(current)
-        return lines[:4]
+        return wrap_text(draw, text, font, max_width)[:4]
 
     def _draw_branding(self, draw: Any, text: str, w: int, h: int) -> None:
         font = self._font(max(24, w // 28))
