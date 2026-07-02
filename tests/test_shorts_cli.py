@@ -6,9 +6,12 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 from shorts import cli
 from shorts.domain.exceptions import ShortsPipelineError
 from shorts.domain.models import GeneratedShort
+from shorts.history import TopicHistory
 from trend_intelligence.domain.exceptions import TrendIntelligenceError
 from trend_intelligence.domain.models import (
     AggregatedTrend,
@@ -20,28 +23,45 @@ from trend_intelligence.domain.models import (
 )
 
 
-def _selected() -> SelectedTopic:
+@pytest.fixture(autouse=True)
+def history_store(tmp_path, monkeypatch):
+    """Point the CLI's TopicHistory at a per-test file, never the real .state/."""
+    path = tmp_path / "state" / "history.json"
+    monkeypatch.setattr(cli, "TopicHistory", lambda p=path: TopicHistory(p))
+    return path
+
+
+def _ranked(cluster: str, title: str, keywords: list[str], rank: int) -> RankedTrend:
     aggregated = AggregatedTrend(
-        cluster_id="c1",
-        canonical_title="AI breakthrough",
-        keywords=["ai", "chip"],
+        cluster_id=cluster,
+        canonical_title=title,
+        keywords=keywords,
         categories=[ContentCategory.TECHNOLOGY],
         sources=[TrendSource.HACKER_NEWS],
         source_count=1,
         popularity_score=0.8,
     )
-    ranked = RankedTrend(
+    return RankedTrend(
         aggregated_trend=aggregated,
         analysis=None,
         score_breakdown=ScoreBreakdown(total=0.7),
         final_score=0.7,
-        rank=1,
+        rank=rank,
+    )
+
+
+def _selected(*, with_alternative: bool = False) -> SelectedTopic:
+    alternatives = (
+        [_ranked("c2", "Quantum computing milestone", ["quantum", "computing"], 2)]
+        if with_alternative
+        else []
     )
     return SelectedTopic(
         title="This AI Chip Changes Everything",
-        ranked_trend=ranked,
+        ranked_trend=_ranked("c1", "AI breakthrough", ["ai", "chip"], 1),
         selection_reason="highest score",
         score=0.65,
+        alternatives=alternatives,
     )
 
 
@@ -188,3 +208,78 @@ def test_generation_failure_fails(tmp_path, monkeypatch, capsys):
 
     assert rc == 1
     assert "Generation failed: [voice] tts down" in capsys.readouterr().err
+
+
+# --- duplicate protection ---------------------------------------------------- #
+def _seed(history_store, *records):
+    history = TopicHistory(history_store)
+    for title, keywords in records:
+        history.record(title, keywords)
+
+
+def test_dedupe_reselects_alternative(tmp_path, monkeypatch, capsys, history_store):
+    _seed(history_store, ("This AI Chip Changes Everything", ["ai", "chip"]))
+    fake = _FakePipeline(result=_short(tmp_path))
+    monkeypatch.setattr(cli, "build_pipeline", lambda config: fake)
+    _patch_discovery(monkeypatch, topic=_selected(with_alternative=True))
+
+    rc = cli.main([])
+
+    assert rc == 0
+    assert fake.calls[0][0].title == "Quantum computing milestone"
+    assert "using alternative" in capsys.readouterr().err
+
+
+def test_dedupe_all_duplicates_is_successful_noop(
+    tmp_path, monkeypatch, capsys, history_store
+):
+    _seed(
+        history_store,
+        ("This AI Chip Changes Everything", ["ai", "chip"]),
+        ("Quantum computing milestone", ["quantum", "computing"]),
+    )
+    fake = _FakePipeline(result=_short(tmp_path))
+    monkeypatch.setattr(cli, "build_pipeline", lambda config: fake)
+    _patch_discovery(monkeypatch, topic=_selected(with_alternative=True))
+
+    rc = cli.main([])
+
+    assert rc == 0
+    assert fake.calls == []  # pipeline never ran
+    assert "Nothing new to post" in capsys.readouterr().err
+
+
+def test_allow_repeat_bypasses_dedupe(tmp_path, monkeypatch, history_store):
+    _seed(history_store, ("This AI Chip Changes Everything", ["ai", "chip"]))
+    fake = _FakePipeline(result=_short(tmp_path))
+    monkeypatch.setattr(cli, "build_pipeline", lambda config: fake)
+    _patch_discovery(monkeypatch, topic=_selected())
+
+    rc = cli.main(["--allow-repeat"])
+
+    assert rc == 0
+    assert fake.calls[0][0].title == "This AI Chip Changes Everything"
+
+
+def test_topic_json_skips_dedupe_but_records(tmp_path, monkeypatch, history_store):
+    _seed(history_store, ("This AI Chip Changes Everything", ["ai", "chip"]))
+    fake = _FakePipeline(result=_short(tmp_path))
+    monkeypatch.setattr(cli, "build_pipeline", lambda config: fake)
+
+    rc = cli.main(["--topic-json", str(_topic_file(tmp_path))])
+
+    assert rc == 0
+    assert len(fake.calls) == 1  # generated despite being in history
+
+
+def test_history_recorded_after_success(tmp_path, monkeypatch, history_store):
+    fake = _FakePipeline(result=_short(tmp_path))
+    monkeypatch.setattr(cli, "build_pipeline", lambda config: fake)
+    _patch_discovery(monkeypatch, topic=_selected())
+
+    rc = cli.main([])
+
+    assert rc == 0
+    entries = json.loads(history_store.read_text(encoding="utf-8"))
+    assert entries[0]["title"] == "This AI Chip Changes Everything"
+    assert entries[0]["keywords"] == ["ai", "chip"]

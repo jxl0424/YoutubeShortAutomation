@@ -14,5 +14,6 @@ htmlcov/
 .ruff_cache/
 output/
 .secrets/
+.state/
 models/
 *TEMP_MPY_*

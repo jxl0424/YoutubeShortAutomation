@@ -22,6 +22,7 @@ from trend_intelligence.pipeline import query_from_config
 from .config.settings import ShortsConfig
 from .domain.exceptions import ShortsError
 from .domain.models import GeneratedShort
+from .history import TopicHistory
 from .pipeline import build_pipeline
 
 
@@ -49,6 +50,11 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         help="Use the offline mock LLM for discovery",
     )
     parser.add_argument(
+        "--allow-repeat",
+        action="store_true",
+        help="Skip the recently-posted-topic check on discovery runs",
+    )
+    parser.add_argument(
         "--work-dir",
         help="Directory for the generated package (default: output/<slug>-<timestamp>)",
     )
@@ -69,6 +75,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"Configuration error: {exc}", file=sys.stderr)
         return 1
 
+    history = TopicHistory()
     if args.topic_json:
         try:
             topic = _load_topic(Path(args.topic_json))
@@ -83,6 +90,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         except TrendIntelligenceError as exc:
             print(f"No topic could be selected: {exc}", file=sys.stderr)
             return 1
+        if not args.allow_repeat:
+            topic = _apply_history(topic, history)
+            if topic is None:
+                # A no-repeat day is a successful no-op for a scheduled run.
+                print(
+                    "Nothing new to post: every candidate topic was already "
+                    "generated recently (use --allow-repeat to override).",
+                    file=sys.stderr,
+                )
+                return 0
 
     # Progress goes to stderr so stdout stays clean for --json.
     print(f"Topic: {topic.title}  (score {topic.score:.3f})", file=sys.stderr)
@@ -94,6 +111,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     except ShortsError as exc:
         print(f"Generation failed: {exc}", file=sys.stderr)
         return 1
+
+    history.record(
+        topic.title,
+        topic.ranked_trend.aggregated_trend.keywords,
+        video_url=short.upload.url if short.upload and short.upload.uploaded else None,
+    )
 
     if args.json:
         print(short.model_dump_json(indent=2))
@@ -114,6 +137,38 @@ def _discover_topic(args: argparse.Namespace) -> SelectedTopic:
         config.llm.provider = "mock"
     pipeline = build_discovery_pipeline(config)
     return pipeline.run(query_from_config(config), override_title=args.override)
+
+
+def _apply_history(topic: SelectedTopic, history: TopicHistory) -> SelectedTopic | None:
+    """Swap a recently-posted topic for its best unposted alternative.
+
+    Stage 1 stays untouched: ``SelectedTopic.alternatives`` already carries the
+    ranked runners-up, so re-selection happens entirely at this boundary.
+    Returns None when every candidate was posted within the lookback window.
+    """
+    if not history.is_duplicate(
+        topic.title, topic.ranked_trend.aggregated_trend.keywords
+    ):
+        return topic
+    for alt in topic.alternatives:
+        title = (
+            alt.analysis.refined_title
+            if alt.analysis and alt.analysis.refined_title
+            else alt.aggregated_trend.canonical_title
+        )
+        if history.is_duplicate(title, alt.aggregated_trend.keywords):
+            continue
+        print(
+            f"Topic already posted recently — using alternative: {title}",
+            file=sys.stderr,
+        )
+        return SelectedTopic(
+            title=title,
+            ranked_trend=alt,
+            selection_reason="dedupe re-selection: previous pick was posted recently",
+            score=alt.final_score,
+        )
+    return None
 
 
 def _print_short(short: GeneratedShort, title: str) -> None:
