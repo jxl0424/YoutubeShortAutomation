@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import ClassVar
 
 import pytest
@@ -128,6 +129,33 @@ def _ctx(tmp):
 def test_uploader_disabled_by_default():
     stage = Uploader(FakeUploadProvider())
     assert stage.is_enabled(ShortsConfig()) is False
+
+
+def _enabled_config(tmp_path):
+    config = ShortsConfig()
+    config.upload.enabled = True
+    config.upload.token_path = str(tmp_path / "no_token.json")  # not cached
+    return config
+
+
+def test_uploader_skips_when_enabled_but_no_credentials(tmp_path, monkeypatch):
+    monkeypatch.delenv("YOUTUBE_CLIENT_SECRETS", raising=False)
+    stage = Uploader(FakeUploadProvider())
+    assert stage.is_enabled(_enabled_config(tmp_path)) is False
+
+
+def test_uploader_enabled_with_client_secrets_env(tmp_path, monkeypatch):
+    monkeypatch.setenv("YOUTUBE_CLIENT_SECRETS", str(tmp_path / "secrets.json"))
+    stage = Uploader(FakeUploadProvider())
+    assert stage.is_enabled(_enabled_config(tmp_path)) is True
+
+
+def test_uploader_enabled_with_cached_token(tmp_path, monkeypatch):
+    monkeypatch.delenv("YOUTUBE_CLIENT_SECRETS", raising=False)
+    config = _enabled_config(tmp_path)
+    Path(config.upload.token_path).write_text("{}", encoding="utf-8")
+    stage = Uploader(FakeUploadProvider())
+    assert stage.is_enabled(config) is True
 
 
 def test_uploader_runs_when_enabled(tmp_path):

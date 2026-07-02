@@ -91,7 +91,7 @@ packaging:
   output_dir: output
 
 upload:
-  enabled: true        # pipeline runs fully even with uploads disabled
+  enabled: true        # stage skips itself (with a warning) if no OAuth creds are set
   privacy: private
   category_id: "22"
   client_secrets_env: YOUTUBE_CLIENT_SECRETS
