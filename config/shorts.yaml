@@ -40,9 +40,7 @@ voice:
   kokoro_voices_path: models/kokoro/voices-v1.0.bin
 
 visual_planning:
-  words_per_second: 2.5
-  min_scene_seconds: 2.0
-  max_scene_seconds: 6.0
+  words_per_second: 2.5   # scene lengths are proportional to words (no clamps)
   default_visual_type: stock_video
 
 assets:
@@ -59,7 +57,6 @@ assets:
 validation:
   min_width: 720
   min_height: 1280
-  target_aspect_ratio: "9:16"
   allow_duplicates: false
 
 video:

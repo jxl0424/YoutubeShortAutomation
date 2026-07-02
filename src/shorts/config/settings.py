@@ -70,9 +70,9 @@ class VoiceConfig(_Section):
 
 
 class VisualPlanningConfig(_Section):
+    # Scene durations are purely proportional to narration word counts (see
+    # VisualPlanner._plan); there is deliberately no per-scene min/max clamp.
     words_per_second: float = Field(default=2.5, gt=0)
-    min_scene_seconds: float = Field(default=2.0, gt=0)
-    max_scene_seconds: float = Field(default=6.0, gt=0)
     default_visual_type: VisualType = VisualType.STOCK_VIDEO
 
 
@@ -103,7 +103,6 @@ class AssetsConfig(_Section):
 class ValidationConfig(_Section):
     min_width: int = Field(default=720, ge=1)
     min_height: int = Field(default=1280, ge=1)
-    target_aspect_ratio: str = "9:16"
     allow_duplicates: bool = False
 
 
