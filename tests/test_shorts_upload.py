@@ -85,7 +85,7 @@ def test_uploads_video_and_returns_result(tmp_path):
     result = provider.upload(_package(tmp_path), _metadata())
     assert result.uploaded is True
     assert result.video_id == "abc123"
-    assert result.url == "https://youtu.be/abc123"
+    assert result.url == "https://www.youtube.com/shorts/abc123"
     assert service.inserted["body"]["snippet"]["title"] == "My Short"
     assert service.thumb_set == "abc123"  # thumbnail was set
 

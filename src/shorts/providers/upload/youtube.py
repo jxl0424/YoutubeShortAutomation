@@ -133,6 +133,8 @@ class YouTubeUploadProvider(UploadProvider):
         return UploadResult(
             uploaded=True,
             video_id=video_id,
-            url=f"https://youtu.be/{video_id}" if video_id else None,
+            # The /shorts/ URL: youtu.be/<id> opens the regular watch player
+            # even for Shorts, which reads as "it didn't upload as a Short".
+            url=f"https://www.youtube.com/shorts/{video_id}" if video_id else None,
             status=status,
         )
