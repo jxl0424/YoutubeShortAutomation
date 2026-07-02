@@ -31,7 +31,9 @@ def history_store(tmp_path, monkeypatch):
     return path
 
 
-def _ranked(cluster: str, title: str, keywords: list[str], rank: int) -> RankedTrend:
+def _ranked(
+    cluster: str, title: str, keywords: list[str], rank: int, score: float = 0.7
+) -> RankedTrend:
     aggregated = AggregatedTrend(
         cluster_id=cluster,
         canonical_title=title,
@@ -44,8 +46,8 @@ def _ranked(cluster: str, title: str, keywords: list[str], rank: int) -> RankedT
     return RankedTrend(
         aggregated_trend=aggregated,
         analysis=None,
-        score_breakdown=ScoreBreakdown(total=0.7),
-        final_score=0.7,
+        score_breakdown=ScoreBreakdown(total=score),
+        final_score=score,
         rank=rank,
     )
 
@@ -270,6 +272,45 @@ def test_topic_json_skips_dedupe_but_records(tmp_path, monkeypatch, history_stor
 
     assert rc == 0
     assert len(fake.calls) == 1  # generated despite being in history
+
+
+def _selected_with_alternatives(*alts) -> SelectedTopic:
+    topic = _selected()
+    return topic.model_copy(update={"alternatives": list(alts)})
+
+
+def test_dedupe_skips_raw_query_alternative(tmp_path, monkeypatch, history_store):
+    _seed(history_store, ("This AI Chip Changes Everything", ["ai", "chip"]))
+    fake = _FakePipeline(result=_short(tmp_path))
+    monkeypatch.setattr(cli, "build_pipeline", lambda config: fake)
+    topic = _selected_with_alternatives(
+        _ranked("c2", "sharks", ["sharks"], 2),  # raw one-word trends query
+        _ranked("c3", "Quantum computing milestone", ["quantum", "computing"], 3),
+    )
+    _patch_discovery(monkeypatch, topic=topic)
+
+    rc = cli.main([])
+
+    assert rc == 0
+    assert fake.calls[0][0].title == "Quantum computing milestone"
+
+
+def test_dedupe_skips_low_score_alternative(
+    tmp_path, monkeypatch, capsys, history_store
+):
+    _seed(history_store, ("This AI Chip Changes Everything", ["ai", "chip"]))
+    fake = _FakePipeline(result=_short(tmp_path))
+    monkeypatch.setattr(cli, "build_pipeline", lambda config: fake)
+    topic = _selected_with_alternatives(
+        _ranked("c2", "A perfectly fine title", ["fine", "title"], 2, score=0.4),
+    )
+    _patch_discovery(monkeypatch, topic=topic)
+
+    rc = cli.main([])
+
+    assert rc == 0
+    assert fake.calls == []  # only alternative failed the gate -> no-op day
+    assert "Nothing new to post" in capsys.readouterr().err
 
 
 def test_history_recorded_after_success(tmp_path, monkeypatch, history_store):

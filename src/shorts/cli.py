@@ -15,7 +15,7 @@ from pathlib import Path
 from trend_intelligence.config.settings import AppConfig
 from trend_intelligence.domain.exceptions import TrendIntelligenceError
 from trend_intelligence.domain.models import SelectedTopic
-from trend_intelligence.logging.setup import configure_logging
+from trend_intelligence.logging.setup import configure_logging, get_logger
 from trend_intelligence.pipeline import build_pipeline as build_discovery_pipeline
 from trend_intelligence.pipeline import query_from_config
 
@@ -139,13 +139,22 @@ def _discover_topic(args: argparse.Namespace) -> SelectedTopic:
     return pipeline.run(query_from_config(config), override_title=args.override)
 
 
+# Alternatives are runners-up, so hold them to a floor: raw trends-query
+# fragments ("sharks") make vague shorts. A conservative no-op day beats
+# uploading junk — everything stays private for review anyway.
+_MIN_ALTERNATIVE_SCORE = 0.5
+_MIN_ALTERNATIVE_TITLE_WORDS = 3
+
+
 def _apply_history(topic: SelectedTopic, history: TopicHistory) -> SelectedTopic | None:
     """Swap a recently-posted topic for its best unposted alternative.
 
     Stage 1 stays untouched: ``SelectedTopic.alternatives`` already carries the
     ranked runners-up, so re-selection happens entirely at this boundary.
-    Returns None when every candidate was posted within the lookback window.
+    Returns None when every candidate was posted within the lookback window
+    (or fails the quality gate).
     """
+    logger = get_logger("shorts.cli")
     if not history.is_duplicate(
         topic.title, topic.ranked_trend.aggregated_trend.keywords
     ):
@@ -157,6 +166,20 @@ def _apply_history(topic: SelectedTopic, history: TopicHistory) -> SelectedTopic
             else alt.aggregated_trend.canonical_title
         )
         if history.is_duplicate(title, alt.aggregated_trend.keywords):
+            continue
+        if alt.final_score < _MIN_ALTERNATIVE_SCORE:
+            logger.info(
+                "dedupe_alternative_rejected",
+                title=title,
+                reason=f"score {alt.final_score:.2f} < {_MIN_ALTERNATIVE_SCORE}",
+            )
+            continue
+        if len(title.split()) < _MIN_ALTERNATIVE_TITLE_WORDS:
+            logger.info(
+                "dedupe_alternative_rejected",
+                title=title,
+                reason="title too short (raw trends query)",
+            )
             continue
         print(
             f"Topic already posted recently — using alternative: {title}",
