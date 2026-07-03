@@ -227,30 +227,40 @@ class MoviePyRenderer(VideoRenderer):
         w = request.width
         font_size = max(32, w // 15)  # ~72px at 1080w
         font = load_bold_font(font_size)
-        stroke = max(2, font_size // 12)
+        stroke = max(3, font_size // 9)  # heavier stroke for pop on any bg
 
         probe = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
-        lines = wrap_text(probe, text.upper(), font, int(w * 0.9))[:2]
-        line_height = int(font_size * 1.15)
+        lines = wrap_text(probe, text.upper(), font, int(w * 0.86))[:2]
+        line_height = int(font_size * 1.2)
+        pad_x, pad_y = font_size // 2, font_size // 6  # pill padding around text
 
         strip = Image.new(
-            "RGBA", (w, line_height * len(lines) + stroke * 2 + 8), (0, 0, 0, 0)
+            "RGBA", (w, line_height * len(lines) + stroke * 2 + 16), (0, 0, 0, 0)
         )
         draw = ImageDraw.Draw(strip)
         for i, line in enumerate(lines):
             text_width = draw.textlength(line, font=font)
+            x = (w - text_width) // 2
+            y = stroke + i * line_height
+            # Semi-transparent rounded pill behind the text so it stays legible
+            # over bright footage (flag/sky/pale rooms washed out plain white).
+            draw.rounded_rectangle(
+                [x - pad_x, y - pad_y, x + text_width + pad_x, y + font_size + pad_y],
+                radius=font_size // 3,
+                fill=(0, 0, 0, 140),
+            )
             draw.text(
-                ((w - text_width) // 2, stroke + i * line_height),
+                (x, y),
                 line,
                 font=font,
                 fill=(255, 255, 255, 255),
                 stroke_width=stroke,
                 stroke_fill=(0, 0, 0, 255),
             )
-        # Top-center (~14% down): clear of the subject center and the burned
-        # narration captions at the bottom.
+        # Top-center (~20% down): clear of the YouTube Shorts UI (channel/
+        # subscribe crowd the top edge) and the burned captions at the bottom.
         clip = ImageClip(np.asarray(strip), transparent=True)
-        return clip.with_position((0, int(request.height * 0.14)))
+        return clip.with_position((0, int(request.height * 0.20)))
 
     def _still_clip(self, path: Path, w: int, h: int, d: float) -> Any:
         from moviepy import ImageClip
