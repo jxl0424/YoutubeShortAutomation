@@ -85,9 +85,7 @@ class PrePublishQA(PipelineStage):
 
         # 3. Portrait orientation at or above the resolution floor.
         if video.width >= video.height:
-            issues.append(
-                f"video is {video.width}x{video.height} (not portrait)"
-            )
+            issues.append(f"video is {video.width}x{video.height} (not portrait)")
         if video.width < validation.min_width or video.height < validation.min_height:
             issues.append(
                 f"video is {video.width}x{video.height}, below "
@@ -118,9 +116,7 @@ class PrePublishQA(PipelineStage):
 
         # 7. Description and tags substantial enough to publish.
         if len(meta.description.strip()) < _MIN_DESCRIPTION_CHARS:
-            issues.append(
-                f"description under {_MIN_DESCRIPTION_CHARS} characters"
-            )
+            issues.append(f"description under {_MIN_DESCRIPTION_CHARS} characters")
         if len(meta.tags) < _MIN_TAGS:
             issues.append(f"fewer than {_MIN_TAGS} tags")
 
