@@ -90,6 +90,31 @@ def test_uploads_video_and_returns_result(tmp_path):
     assert service.thumb_set == "abc123"  # thumbnail was set
 
 
+def test_status_declares_synthetic_media_and_kids(tmp_path):
+    service = FakeService({"id": "x"})
+    provider = YouTubeUploadProvider(
+        build_service=lambda: service,
+        media_factory=lambda p: f"media:{p}",
+        privacy="public",
+    )
+    provider.upload(_package(tmp_path), _metadata())
+    status = service.inserted["body"]["status"]
+    assert status["privacyStatus"] == "public"
+    assert status["selfDeclaredMadeForKids"] is False
+    assert status["containsSyntheticMedia"] is True
+
+
+def test_privacy_override_wins_over_configured_default(tmp_path):
+    service = FakeService({"id": "x"})
+    provider = YouTubeUploadProvider(
+        build_service=lambda: service,
+        media_factory=lambda p: f"media:{p}",
+        privacy="public",
+    )
+    provider.upload(_package(tmp_path), _metadata(), privacy="private")
+    assert service.inserted["body"]["status"]["privacyStatus"] == "private"
+
+
 def test_missing_video_raises(tmp_path):
     provider = _provider({"id": "x"})
     pkg = GeneratedShort(output_dir=tmp_path, video_path=None)
@@ -109,9 +134,11 @@ class FakeUploadProvider(UploadProvider):
 
     def __init__(self):
         self.called = False
+        self.privacy = None
 
-    def upload(self, package, metadata) -> UploadResult:
+    def upload(self, package, metadata, *, privacy=None) -> UploadResult:
         self.called = True
+        self.privacy = privacy
         return UploadResult(uploaded=True, video_id="vid", url="u", status="uploaded")
 
 
@@ -162,8 +189,10 @@ def test_uploader_runs_when_enabled(tmp_path):
     provider = FakeUploadProvider()
     ctx = _ctx(tmp_path)
     ctx.config.upload.enabled = True
+    ctx.publish_privacy = "public"  # as PrePublishQA would set on a pass
     Uploader(provider).run(ctx)
     assert provider.called is True
+    assert provider.privacy == "public"  # QA-resolved privacy flows through
     assert ctx.upload_result.video_id == "vid"
     assert ctx.package.upload.video_id == "vid"  # recorded on package too
 

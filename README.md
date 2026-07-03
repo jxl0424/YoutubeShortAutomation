@@ -153,10 +153,29 @@ Uploads are off by default. One-time setup (Google Cloud Console):
    `.secrets/client_secrets.json` (gitignored) and set in `.env`:
    `YOUTUBE_CLIENT_SECRETS=.secrets/client_secrets.json`.
 4. `pip install -e ".[youtube]"` and set `upload.enabled: true` in
-   `config/shorts.yaml` (`privacy: private` is the safe default).
+   `config/shorts.yaml`. The shipped config publishes QA-passing shorts to
+   `public`; set `privacy: private` for a manual-review workflow instead.
 
 The first upload opens a browser consent once, then caches a refresh token at
 `.secrets/youtube_token.json` — later runs are hands-free.
+
+### Upload settings & the pre-publish QA gate
+
+Before every upload, the `pre_publish_qa` stage runs deterministic checks on the
+finished package — video integrity, duration/resolution bounds, captions and
+thumbnail present, and a valid title/description/tags. A **pass** publishes at
+`upload.privacy`; a **failure** downgrades that upload to
+`upload.qa_fail_privacy` (`private`) so a bad render becomes a manual-review queue
+instead of going live. QA never aborts the run.
+
+Each upload also self-declares the YouTube `status` flags (`videos.insert`):
+
+- **`contains_synthetic_media: true`** — discloses AI/altered content, as YouTube
+  requires for realistic synthetic media. On by default for this channel.
+- **`made_for_kids: false`** — general-audience news/tech, not child-directed.
+- **Age restriction** is intentionally not set: `ytRating` is read-only in the
+  Data API and can only be applied manually in YouTube Studio (general-audience
+  content needs none).
 
 ## Daily scheduled run (Windows)
 
@@ -175,7 +194,8 @@ user (while logged on), appending output to `logs/daily-<yyyyMMdd>.log`. Notes:
   alternative, and a day with nothing new is a logged no-op (exit 0). Bypass
   with `python -m shorts --allow-repeat`.
 - **Quota**: one upload costs 1600 of the 10,000 daily YouTube API quota units.
-- Uploads stay `private` (per config) for manual review before publishing.
+- QA-passing shorts publish at `upload.privacy` (`public` = fully automatic);
+  QA failures always land at `qa_fail_privacy` (`private`) for review.
 - Remove with `Unregister-ScheduledTask -TaskName "YouTubeShortsDaily"`.
 
 ## Configuration

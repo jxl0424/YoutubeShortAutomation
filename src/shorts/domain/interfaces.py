@@ -122,8 +122,17 @@ class UploadProvider(ABC):
     name: ClassVar[str]
 
     @abstractmethod
-    def upload(self, package: GeneratedShort, metadata: VideoMetadata) -> UploadResult:
-        """Upload the package; must be no-op-safe when uploads are disabled."""
+    def upload(
+        self,
+        package: GeneratedShort,
+        metadata: VideoMetadata,
+        *,
+        privacy: str | None = None,
+    ) -> UploadResult:
+        """Upload the package, optionally overriding the configured privacy.
+
+        Must be no-op-safe when uploads are disabled.
+        """
 
 
 class PipelineStage(ABC):

@@ -148,8 +148,16 @@ class PackagingConfig(_Section):
 
 class UploadConfig(_Section):
     enabled: bool = False
+    # Privacy a QA-passing short publishes with (the shipped yaml opts into
+    # "public"); a QA failure downgrades to ``qa_fail_privacy`` for review.
     privacy: str = "private"
+    qa_fail_privacy: str = "private"
     category_id: str = "22"
+    # Self-declared YouTube status flags (see the Data API `videos.insert`
+    # `status` block). Age restriction is deliberately absent: `ytRating` is
+    # read-only in the API and can only be self-applied manually in Studio.
+    contains_synthetic_media: bool = True
+    made_for_kids: bool = False
     client_secrets_env: str = "YOUTUBE_CLIENT_SECRETS"
     token_path: str = ".secrets/youtube_token.json"
 

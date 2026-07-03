@@ -5,6 +5,7 @@ from .assets import AssetCollector
 from .enrichment import TopicEnricher
 from .metadata import MetadataGenerator
 from .packaging import Packager
+from .qa import PrePublishQA
 from .script import ScriptGenerator
 from .thumbnail import ThumbnailGenerator
 from .upload import Uploader
@@ -17,6 +18,7 @@ __all__ = [
     "AssetValidator",
     "MetadataGenerator",
     "Packager",
+    "PrePublishQA",
     "ScriptGenerator",
     "ThumbnailGenerator",
     "TopicEnricher",

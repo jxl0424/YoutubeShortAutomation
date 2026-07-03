@@ -207,6 +207,21 @@ class ThumbnailResult(_Model):
 
 
 # --------------------------------------------------------------------------- #
+# Pre-publish QA
+# --------------------------------------------------------------------------- #
+class QAReport(_Model):
+    """Result of the deterministic pre-publish quality gate.
+
+    A binary gate: any failed check drops ``ok`` to False and the offending
+    checks are listed in ``issues``. A failing report downgrades the upload's
+    privacy (to a review queue) rather than aborting the pipeline.
+    """
+
+    ok: bool = True
+    issues: list[str] = Field(default_factory=list)
+
+
+# --------------------------------------------------------------------------- #
 # Upload + final package
 # --------------------------------------------------------------------------- #
 class UploadResult(_Model):

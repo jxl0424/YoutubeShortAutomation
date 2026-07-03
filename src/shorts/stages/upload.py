@@ -49,9 +49,17 @@ class Uploader(PipelineStage):
         if ctx.metadata is None:
             raise UploadError("upload requires metadata")
 
+        # PrePublishQA resolves this (public on pass, review privacy on fail);
+        # fall back to the configured privacy if the QA stage was skipped.
+        privacy = ctx.publish_privacy or ctx.config.upload.privacy
         with log_duration(self._logger, "youtube_upload"):
-            result = self._provider.upload(ctx.package, ctx.metadata)
+            result = self._provider.upload(ctx.package, ctx.metadata, privacy=privacy)
 
         ctx.upload_result = result
         ctx.package.upload = result
-        self._logger.info("upload_done", video_id=result.video_id, status=result.status)
+        self._logger.info(
+            "upload_done",
+            video_id=result.video_id,
+            status=result.status,
+            privacy=privacy,
+        )

@@ -47,6 +47,10 @@ class RenderError(StageError):
     """Video assembly/rendering failed."""
 
 
+class QAError(StageError):
+    """The pre-publish QA gate could not run (missing artifacts)."""
+
+
 class UploadError(StageError):
     """Upload to the destination platform failed."""
 

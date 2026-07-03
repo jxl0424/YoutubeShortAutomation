@@ -92,8 +92,16 @@ packaging:
 
 upload:
   enabled: true        # stage skips itself (with a warning) if no OAuth creds are set
-  privacy: private
+  privacy: public      # QA-pass privacy — QA failures land at qa_fail_privacy
+  qa_fail_privacy: private   # QA failures land here as a manual-review queue
   category_id: "22"
+  # Self-declared status flags. A faceless channel of AI voice + AI/stock
+  # imagery for real news discloses synthetic media (YouTube requires it for
+  # realistic altered content) and is not child-directed. Age restriction is
+  # NOT here: it is read-only in the Data API and only settable manually in
+  # YouTube Studio — general-audience content needs none anyway.
+  contains_synthetic_media: true
+  made_for_kids: false
   client_secrets_env: YOUTUBE_CLIENT_SECRETS
   token_path: .secrets/youtube_token.json
 

@@ -22,6 +22,11 @@ def test_load_default_config():
     # Shipped config has uploads ON; the Uploader stage still skips itself
     # (with a warning) on machines without OAuth credentials configured.
     assert config.upload.enabled is True
+    # Auto-publish public on QA pass; a QA failure downgrades to private.
+    assert config.upload.privacy == "public"
+    assert config.upload.qa_fail_privacy == "private"
+    assert config.upload.contains_synthetic_media is True
+    assert config.upload.made_for_kids is False
     assert config.visual_planning.default_visual_type is VisualType.STOCK_VIDEO
 
 

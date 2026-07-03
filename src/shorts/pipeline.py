@@ -30,6 +30,7 @@ from .domain.interfaces import PipelineStage
 from .domain.models import (
     AssetValidationReport,
     GeneratedShort,
+    QAReport,
     RenderedVideo,
     ScenePlan,
     Script,
@@ -59,6 +60,8 @@ class PipelineContext:
     rendered_video: RenderedVideo | None = None
     thumbnail: ThumbnailResult | None = None
     package: GeneratedShort | None = None
+    qa_report: QAReport | None = None
+    publish_privacy: str | None = None
     upload_result: UploadResult | None = None
 
 
@@ -146,6 +149,7 @@ def build_pipeline(
         AssetValidator,
         MetadataGenerator,
         Packager,
+        PrePublishQA,
         ScriptGenerator,
         ThumbnailGenerator,
         TopicEnricher,
@@ -183,6 +187,7 @@ def build_pipeline(
         VideoAssembler(video_renderer),
         ThumbnailGenerator(thumb_renderer),
         Packager(file_storage),
+        PrePublishQA(),
         Uploader(uploader),
     ]
     return ShortsPipeline(stages, config)

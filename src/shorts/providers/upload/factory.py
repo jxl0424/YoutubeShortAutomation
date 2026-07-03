@@ -15,4 +15,6 @@ def build_upload_provider(config: UploadConfig) -> UploadProvider:
         token_path=config.token_path,
         privacy=config.privacy,
         category_id=config.category_id,
+        contains_synthetic_media=config.contains_synthetic_media,
+        made_for_kids=config.made_for_kids,
     )

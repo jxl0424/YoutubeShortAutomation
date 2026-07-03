@@ -31,6 +31,8 @@ class YouTubeUploadProvider(UploadProvider):
         token_path: str = ".secrets/youtube_token.json",
         privacy: str = "private",
         category_id: str = "22",
+        contains_synthetic_media: bool = True,
+        made_for_kids: bool = False,
         build_service: Callable[[], Any] | None = None,
         media_factory: Callable[[str], Any] | None = None,
     ) -> None:
@@ -38,6 +40,8 @@ class YouTubeUploadProvider(UploadProvider):
         self._token_path = Path(token_path)
         self._privacy = privacy
         self._category_id = category_id
+        self._contains_synthetic_media = contains_synthetic_media
+        self._made_for_kids = made_for_kids
         self._build_service = build_service
         self._media_factory = media_factory or self._default_media
         self._logger = get_logger("shorts.upload")
@@ -84,7 +88,13 @@ class YouTubeUploadProvider(UploadProvider):
             self._token_path.write_text(creds.to_json(), encoding="utf-8")
         return build("youtube", "v3", credentials=creds)
 
-    def upload(self, package: GeneratedShort, metadata: VideoMetadata) -> UploadResult:
+    def upload(
+        self,
+        package: GeneratedShort,
+        metadata: VideoMetadata,
+        *,
+        privacy: str | None = None,
+    ) -> UploadResult:
         if package.video_path is None or not Path(package.video_path).exists():
             raise UploadError("no rendered video to upload")
 
@@ -100,8 +110,9 @@ class YouTubeUploadProvider(UploadProvider):
                 "categoryId": self._category_id,
             },
             "status": {
-                "privacyStatus": self._privacy,
-                "selfDeclaredMadeForKids": False,
+                "privacyStatus": privacy or self._privacy,
+                "selfDeclaredMadeForKids": self._made_for_kids,
+                "containsSyntheticMedia": self._contains_synthetic_media,
             },
         }
 
@@ -129,7 +140,12 @@ class YouTubeUploadProvider(UploadProvider):
             except Exception as exc:
                 self._logger.warning("thumbnail_upload_failed", error=str(exc))
 
-        self._logger.info("uploaded", video_id=video_id, status=status)
+        self._logger.info(
+            "uploaded",
+            video_id=video_id,
+            status=status,
+            privacy=privacy or self._privacy,
+        )
         return UploadResult(
             uploaded=True,
             video_id=video_id,
