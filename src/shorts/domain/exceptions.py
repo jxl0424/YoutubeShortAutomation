@@ -55,6 +55,10 @@ class UploadError(StageError):
     """Upload to the destination platform failed."""
 
 
+class ArchiveError(StageError):
+    """Mirroring the package to cloud storage failed."""
+
+
 class ReportError(ShortsError):
     """The channel analytics report could not be produced."""
 

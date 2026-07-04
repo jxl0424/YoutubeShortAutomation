@@ -162,6 +162,30 @@ class UploadConfig(_Section):
     token_path: str = ".secrets/youtube_token.json"
 
 
+class ArchiveConfig(_Section):
+    """Mirror finished shorts to S3-compatible object storage (e.g. Cloudflare
+    R2). Off by default — needs a bucket and the three credential env vars. The
+    raw ``assets/`` footage is skipped unless ``include_assets`` (it is large
+    and re-downloadable)."""
+
+    enabled: bool = False
+    bucket: str = ""
+    prefix: str = "shorts"
+    include_assets: bool = False
+    endpoint_url_env: str = "R2_ENDPOINT_URL"
+    access_key_id_env: str = "R2_ACCESS_KEY_ID"
+    secret_access_key_env: str = "R2_SECRET_ACCESS_KEY"
+
+
+class RetentionConfig(_Section):
+    """Prune old local runs to reclaim disk. Off by default (destructive). The
+    newest ``keep_runs`` folders are kept intact; older runs lose only their
+    re-downloadable ``assets/`` — the small deliverable stays local."""
+
+    enabled: bool = False
+    keep_runs: int = Field(default=5, ge=1)
+
+
 class ReportConfig(_Section):
     """Weekly channel-growth report (``shorts-report``).
 
@@ -197,6 +221,8 @@ class ShortsConfig(BaseModel):
     thumbnail: ThumbnailConfig = Field(default_factory=ThumbnailConfig)
     packaging: PackagingConfig = Field(default_factory=PackagingConfig)
     upload: UploadConfig = Field(default_factory=UploadConfig)
+    archive: ArchiveConfig = Field(default_factory=ArchiveConfig)
+    retention: RetentionConfig = Field(default_factory=RetentionConfig)
     report: ReportConfig = Field(default_factory=ReportConfig)
     http: HttpConfig = Field(default_factory=HttpConfig)
 

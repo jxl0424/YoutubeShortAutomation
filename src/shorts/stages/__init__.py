@@ -1,5 +1,6 @@
 """Pipeline stages — each an independent, replaceable step."""
 
+from .archive import CloudArchiver
 from .assembly import VideoAssembler
 from .assets import AssetCollector
 from .enrichment import TopicEnricher
@@ -16,6 +17,7 @@ from .voice import VoiceGenerator
 __all__ = [
     "AssetCollector",
     "AssetValidator",
+    "CloudArchiver",
     "MetadataGenerator",
     "Packager",
     "PrePublishQA",

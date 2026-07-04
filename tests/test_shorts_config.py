@@ -28,6 +28,13 @@ def test_load_default_config():
     assert config.upload.contains_synthetic_media is True
     assert config.upload.made_for_kids is False
     assert config.visual_planning.default_visual_type is VisualType.STOCK_VIDEO
+    # Cloud archive + local retention ship OFF (opt-in; archive needs R2 creds,
+    # retention is destructive).
+    assert config.archive.enabled is False
+    assert config.archive.prefix == "shorts"
+    assert config.archive.include_assets is False
+    assert config.retention.enabled is False
+    assert config.retention.keep_runs == 5
     # Weekly report uses its own read-only token, never the upload token.
     assert config.report.output_dir == "reports"
     assert config.report.top_videos == 5

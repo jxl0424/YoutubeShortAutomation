@@ -105,6 +105,29 @@ upload:
   client_secrets_env: YOUTUBE_CLIENT_SECRETS
   token_path: .secrets/youtube_token.json
 
+archive:
+  # Mirror each finished short to S3-compatible object storage (default:
+  # Cloudflare R2 — 10 GB free, no egress fees). OFF until you create a bucket
+  # and add R2_ENDPOINT_URL / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY to .env
+  # and set `bucket` below (see README). The stage skips itself (with a
+  # warning) when disabled or uncredentialed, and never fails an otherwise
+  # successful run. Raw assets/ footage is skipped (large + re-downloadable).
+  enabled: false
+  bucket: ""
+  prefix: shorts
+  include_assets: false
+  endpoint_url_env: R2_ENDPOINT_URL
+  access_key_id_env: R2_ACCESS_KEY_ID
+  secret_access_key_env: R2_SECRET_ACCESS_KEY
+
+retention:
+  # Prune old local runs so output/ stops growing. OFF by default (destructive).
+  # The newest `keep_runs` folders are kept intact; older runs lose only their
+  # re-downloadable assets/ subfolder (~85% of the size) — the small deliverable
+  # (video.mp4, thumbnail, metadata) stays local. Runs after each daily job.
+  enabled: false
+  keep_runs: 5
+
 report:
   # Weekly channel-growth report (shorts-report / scripts/run_weekly_report.ps1).
   # Read-only scopes with a SEPARATE token from the upload one; the first run

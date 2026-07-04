@@ -231,6 +231,14 @@ class UploadResult(_Model):
     status: str = "skipped"
 
 
+class ArchiveResult(_Model):
+    """Outcome of mirroring the package to cloud object storage."""
+
+    archived: bool = False
+    bucket: str = ""
+    keys: list[str] = Field(default_factory=list)
+
+
 class GeneratedShort(_Model):
     """The final upload-ready package — paths to every produced artifact."""
 
@@ -245,4 +253,5 @@ class GeneratedShort(_Model):
     assets_dir: Path | None = None
     logs_dir: Path | None = None
     upload: UploadResult | None = None
+    archive: ArchiveResult | None = None
     created_at: datetime = Field(default_factory=utcnow)

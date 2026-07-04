@@ -212,4 +212,5 @@ def test_build_pipeline_wires_all_stages():
         "packaging",
         "pre_publish_qa",
         "youtube_upload",
+        "cloud_archive",
     ]

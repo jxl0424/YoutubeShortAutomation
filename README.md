@@ -221,6 +221,31 @@ The task runs [`scripts/run_weekly_report.ps1`](scripts/run_weekly_report.ps1)
   before that for deltas), no matter when the task fires. Analytics data can
   lag up to ~48h, so the freshest days may still be settling.
 
+## Cloud archive & local retention
+
+Published shorts pile up (~113–140 MB each; ~85% is re-downloadable stock
+footage). Two optional, independent features keep this in check — both **off by
+default**:
+
+**Cloud archive** mirrors each finished short's *deliverable* (video, thumbnail,
+captions, metadata, text — not the raw `assets/`) to S3-compatible object
+storage after upload. It runs as a best-effort pipeline stage: a backup failure
+logs a warning but never fails an already-published run.
+
+1. `pip install -e ".[cloud]"`.
+2. Create a bucket + API token on **Cloudflare R2** (10 GB free, no egress
+   fees) — or any S3 API: Backblaze B2, AWS S3, MinIO.
+3. Add to `.env`: `R2_ENDPOINT_URL`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`.
+4. In `config/shorts.yaml` set `archive.bucket` and `archive.enabled: true`.
+   Objects land at `s3://<bucket>/<prefix>/<run-name>/<file>`. Point
+   `archive.*_env` at different env var names to use another provider's keys.
+
+**Local retention** prunes old runs so `output/` stops growing. The newest
+`retention.keep_runs` folders are kept intact; older runs lose only their
+re-downloadable `assets/` subfolder — the small deliverable stays local. It runs
+automatically at the end of each daily job. Enable with `retention.enabled: true`
+(it is destructive, so opt in once you trust it).
+
 ## Configuration
 
 Everything is configured in [`config/default.yaml`](config/default.yaml) — enabled

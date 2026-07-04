@@ -24,6 +24,7 @@ from .domain.exceptions import ShortsError
 from .domain.models import GeneratedShort
 from .history import TopicHistory
 from .pipeline import build_pipeline
+from .retention import prune_output
 
 
 def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
@@ -117,6 +118,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         topic.ranked_trend.aggregated_trend.keywords,
         video_url=short.upload.url if short.upload and short.upload.uploaded else None,
     )
+
+    if config.retention.enabled:
+        prune_output(config)
 
     if args.json:
         print(short.model_dump_json(indent=2))

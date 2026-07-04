@@ -28,6 +28,7 @@ from .domain.brief import TopicBrief
 from .domain.exceptions import ShortsPipelineError
 from .domain.interfaces import PipelineStage
 from .domain.models import (
+    ArchiveResult,
     AssetValidationReport,
     GeneratedShort,
     QAReport,
@@ -63,6 +64,7 @@ class PipelineContext:
     qa_report: QAReport | None = None
     publish_privacy: str | None = None
     upload_result: UploadResult | None = None
+    archive_result: ArchiveResult | None = None
 
 
 class ShortsPipeline:
@@ -130,6 +132,7 @@ def build_pipeline(
     thumbnail_renderer=None,
     storage=None,
     upload_provider=None,
+    archive_provider=None,
 ) -> ShortsPipeline:
     """Wire every stage from configuration (optional injection for testing).
 
@@ -137,6 +140,7 @@ def build_pipeline(
     themselves when disabled/unconfigured, so the pipeline runs end-to-end out
     of the box.
     """
+    from .providers.archive import build_archive_provider
     from .providers.llm import build_script_llm
     from .providers.render import build_renderer
     from .providers.storage import build_storage
@@ -147,6 +151,7 @@ def build_pipeline(
     from .stages import (
         AssetCollector,
         AssetValidator,
+        CloudArchiver,
         MetadataGenerator,
         Packager,
         PrePublishQA,
@@ -175,6 +180,7 @@ def build_pipeline(
     thumb_renderer = thumbnail_renderer or build_thumbnail_renderer(config.thumbnail)
     file_storage = storage or build_storage(config.packaging)
     uploader = upload_provider or build_upload_provider(config.upload)
+    archiver = archive_provider or build_archive_provider(config.archive)
 
     stages: list[PipelineStage] = [
         TopicEnricher(timeout=config.http.timeout_seconds),
@@ -189,5 +195,6 @@ def build_pipeline(
         Packager(file_storage),
         PrePublishQA(),
         Uploader(uploader),
+        CloudArchiver(archiver),
     ]
     return ShortsPipeline(stages, config)
