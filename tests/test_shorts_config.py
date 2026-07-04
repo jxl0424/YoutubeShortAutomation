@@ -33,7 +33,9 @@ def test_load_default_config():
     assert config.archive.enabled is False
     assert config.archive.prefix == "shorts"
     assert config.archive.include_assets is False
-    assert config.retention.enabled is False
+    # Retention is ON (prunes old runs' re-downloadable assets/); archive stays
+    # off until R2 creds are configured.
+    assert config.retention.enabled is True
     assert config.retention.keep_runs == 5
     # Weekly report uses its own read-only token, never the upload token.
     assert config.report.output_dir == "reports"

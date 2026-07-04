@@ -125,7 +125,7 @@ retention:
   # The newest `keep_runs` folders are kept intact; older runs lose only their
   # re-downloadable assets/ subfolder (~85% of the size) — the small deliverable
   # (video.mp4, thumbnail, metadata) stays local. Runs after each daily job.
-  enabled: false
+  enabled: true
   keep_runs: 5
 
 report:
