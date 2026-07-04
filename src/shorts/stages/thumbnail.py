@@ -48,7 +48,16 @@ class ThumbnailGenerator(PipelineStage):
 
     @staticmethod
     def _background(ctx):
+        # Prefer a still image, but fall back to any existing asset: the
+        # renderer grabs a mid-clip frame from videos, and stock_video is the
+        # default asset type — image-only selection left every stock-video run
+        # on the solid-fill background.
+        fallback = None
         for asset in ctx.assets:
-            if asset.visual_type in _IMAGE_TYPES and asset.path.exists():
+            if not asset.path.exists():
+                continue
+            if asset.visual_type in _IMAGE_TYPES:
                 return asset.path
-        return None
+            if fallback is None:
+                fallback = asset.path
+        return fallback

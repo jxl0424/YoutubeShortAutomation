@@ -87,9 +87,7 @@ class PillowThumbnailRenderer(ThumbnailRenderer):
     _ACCENT = (255, 196, 0, 255)
 
     def _draw_title(self, draw: Any, title: str, w: int, h: int) -> None:
-        font_size = max(48, w // 8)  # thumbnail-scale type (~135px at 1080w)
-        font = self._font(font_size)
-        lines = self._wrap(draw, title.upper(), font, w - w // 8)
+        font_size, font, lines = self._fit_title(draw, title.upper(), w)
         line_height = int(font_size * 1.12)
         block_height = line_height * len(lines)
         top = int(h * 0.55)  # higher band leaves room for the larger type
@@ -110,9 +108,24 @@ class PillowThumbnailRenderer(ThumbnailRenderer):
                 stroke_fill=(0, 0, 0, 255),
             )
 
-    @staticmethod
-    def _wrap(draw: Any, text: str, font: Any, max_width: int) -> list[str]:
-        return wrap_text(draw, text, font, max_width)[:4]
+    _MAX_LINES = 4
+
+    def _fit_title(self, draw: Any, text: str, w: int) -> tuple[int, Any, list[str]]:
+        """Largest type size (w//8 down to w//16) that wraps within _MAX_LINES.
+
+        Words are never dropped: if even the floor size needs more lines they
+        are all kept — smaller type reads better than a clipped title (which
+        is what the old hard ``[:4]`` truncation produced).
+        """
+        max_width = w - w // 8
+        floor = max(48, w // 16)
+        size = max(48, w // 8)  # thumbnail-scale type (~135px at 1080w)
+        while True:
+            font = self._font(size)
+            lines = wrap_text(draw, text, font, max_width)
+            if len(lines) <= self._MAX_LINES or size <= floor:
+                return size, font, lines
+            size = max(floor, int(size * 0.9))
 
     def _draw_branding(self, draw: Any, text: str, w: int, h: int) -> None:
         font = self._font(max(24, w // 28))

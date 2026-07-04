@@ -89,6 +89,28 @@ def test_video_background_uses_a_real_frame(tmp_path):
     assert r > 120 and g < 90 and b < 90  # red frame, not the navy fallback
 
 
+def test_long_title_shrinks_type_instead_of_dropping_words():
+    from PIL import ImageDraw
+
+    renderer = PillowThumbnailRenderer()
+    draw = ImageDraw.Draw(Image.new("RGB", (1080, 1920)))
+    title = "TECH'S UNLIKELY BOTTLENECK: THE AIR YOU BREATHE MIGHT DECIDE IT ALL"
+    size, _font, lines = renderer._fit_title(draw, title, 1080)
+    assert " ".join(lines) == title  # every word survives
+    assert size < 1080 // 8  # it had to shrink to fit
+    assert len(lines) <= renderer._MAX_LINES
+
+
+def test_short_title_keeps_full_size_type():
+    from PIL import ImageDraw
+
+    renderer = PillowThumbnailRenderer()
+    draw = ImageDraw.Draw(Image.new("RGB", (1080, 1920)))
+    size, _font, lines = renderer._fit_title(draw, "AI CHIP RACE", 1080)
+    assert size == 1080 // 8
+    assert " ".join(lines) == "AI CHIP RACE"
+
+
 # --- stage ----------------------------------------------------------------- #
 class FakeThumbRenderer(ThumbnailRenderer):
     name: ClassVar[str] = "fake"
@@ -133,6 +155,43 @@ def test_stage_builds_request_and_sets_thumbnail(tmp_path):
     assert renderer.request.title == "Metadata Title"  # prefers metadata title
     assert renderer.request.background_path == tmp_path / "a0.jpg"
     assert renderer.request.output_path == tmp_path / "thumbnail.png"
+
+
+def test_stage_falls_back_to_video_asset_when_no_images(tmp_path):
+    # All-stock-video runs (the default) must still get a background: the
+    # renderer extracts a frame from the mp4.
+    renderer = FakeThumbRenderer()
+    ctx = _ctx(tmp_path, assets=False)
+    video = tmp_path / "scene0.mp4"
+    video.write_bytes(b"mp4")
+    ctx.assets = [
+        VisualAsset(
+            scene_index=0,
+            visual_type=VisualType.STOCK_VIDEO,
+            path=video,
+            source="pexels",
+        )
+    ]
+    ThumbnailGenerator(renderer).run(ctx)
+    assert renderer.request.background_path == video
+
+
+def test_stage_prefers_image_background_over_video(tmp_path):
+    renderer = FakeThumbRenderer()
+    ctx = _ctx(tmp_path)  # has a0.jpg (generated_image)
+    video = tmp_path / "scene0.mp4"
+    video.write_bytes(b"mp4")
+    ctx.assets.insert(
+        0,
+        VisualAsset(
+            scene_index=0,
+            visual_type=VisualType.STOCK_VIDEO,
+            path=video,
+            source="pexels",
+        ),
+    )
+    ThumbnailGenerator(renderer).run(ctx)
+    assert renderer.request.background_path == tmp_path / "a0.jpg"
 
 
 def test_stage_falls_back_to_brief_title(tmp_path):
