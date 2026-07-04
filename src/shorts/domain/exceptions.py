@@ -55,6 +55,10 @@ class UploadError(StageError):
     """Upload to the destination platform failed."""
 
 
+class ReportError(ShortsError):
+    """The channel analytics report could not be produced."""
+
+
 class ShortsPipelineError(ShortsError):
     """Wraps a stage failure with the offending stage name."""
 

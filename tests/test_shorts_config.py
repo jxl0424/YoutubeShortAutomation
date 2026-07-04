@@ -28,6 +28,11 @@ def test_load_default_config():
     assert config.upload.contains_synthetic_media is True
     assert config.upload.made_for_kids is False
     assert config.visual_planning.default_visual_type is VisualType.STOCK_VIDEO
+    # Weekly report uses its own read-only token, never the upload token.
+    assert config.report.output_dir == "reports"
+    assert config.report.top_videos == 5
+    assert config.report.token_path == ".secrets/youtube_report_token.json"
+    assert config.report.token_path != config.upload.token_path
 
 
 def test_defaults_without_yaml():

@@ -105,6 +105,16 @@ upload:
   client_secrets_env: YOUTUBE_CLIENT_SECRETS
   token_path: .secrets/youtube_token.json
 
+report:
+  # Weekly channel-growth report (shorts-report / scripts/run_weekly_report.ps1).
+  # Read-only scopes with a SEPARATE token from the upload one; the first run
+  # opens a browser consent and needs the YouTube Analytics API enabled in the
+  # same Google Cloud project as the OAuth client.
+  output_dir: reports
+  top_videos: 5
+  client_secrets_env: YOUTUBE_CLIENT_SECRETS
+  token_path: .secrets/youtube_report_token.json
+
 http:
   timeout_seconds: 60   # image generation (Pollinations) can be slow
   max_retries: 3

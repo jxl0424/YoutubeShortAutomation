@@ -162,6 +162,19 @@ class UploadConfig(_Section):
     token_path: str = ".secrets/youtube_token.json"
 
 
+class ReportConfig(_Section):
+    """Weekly channel-growth report (``shorts-report``).
+
+    Read-only YouTube access with its own OAuth token so the upload token's
+    narrow ``youtube.upload`` scope stays untouched.
+    """
+
+    output_dir: str = "reports"
+    top_videos: int = Field(default=5, ge=1)
+    client_secrets_env: str = "YOUTUBE_CLIENT_SECRETS"
+    token_path: str = ".secrets/youtube_report_token.json"
+
+
 class HttpConfig(_Section):
     timeout_seconds: float = Field(default=60.0, gt=0)
     max_retries: int = Field(default=3, ge=0)
@@ -184,6 +197,7 @@ class ShortsConfig(BaseModel):
     thumbnail: ThumbnailConfig = Field(default_factory=ThumbnailConfig)
     packaging: PackagingConfig = Field(default_factory=PackagingConfig)
     upload: UploadConfig = Field(default_factory=UploadConfig)
+    report: ReportConfig = Field(default_factory=ReportConfig)
     http: HttpConfig = Field(default_factory=HttpConfig)
 
     @classmethod

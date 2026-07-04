@@ -198,6 +198,29 @@ user (while logged on), appending output to `logs/daily-<yyyyMMdd>.log`. Notes:
   QA failures always land at `qa_fail_privacy` (`private`) for review.
 - Remove with `Unregister-ScheduledTask -TaskName "YouTubeShortsDaily"`.
 
+## Weekly channel report (Windows)
+
+A markdown growth report every Monday — views, watch time, subscribers
+gained/lost, and the week's top videos, each compared with the week before:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\register_report_schedule.ps1 -Time "09:30"
+Start-ScheduledTask -TaskName "YouTubeShortsWeeklyReport"   # optional test trigger
+```
+
+The task runs [`scripts/run_weekly_report.ps1`](scripts/run_weekly_report.ps1)
+(`shorts-report` / `python -m shorts.analytics` manually), writing
+`reports/weekly-<date>.md` and raising a toast with the headline numbers. Setup:
+
+- Enable the **YouTube Analytics API** in the same Google Cloud project as the
+  OAuth client (Data API alone is not enough — analytics queries 403 without it).
+- The first run opens a browser consent for two **read-only** scopes and caches
+  a token at `.secrets/youtube_report_token.json` — separate from the upload
+  token, whose narrow `youtube.upload` scope stays untouched.
+- The report window always covers the 7 full days ending yesterday (and the 7
+  before that for deltas), no matter when the task fires. Analytics data can
+  lag up to ~48h, so the freshest days may still be settling.
+
 ## Configuration
 
 Everything is configured in [`config/default.yaml`](config/default.yaml) — enabled
