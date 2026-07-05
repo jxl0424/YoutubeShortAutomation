@@ -11,6 +11,7 @@ from shorts.domain.brief import TopicBrief
 from shorts.domain.exceptions import RenderError
 from shorts.domain.interfaces import VideoRenderer
 from shorts.domain.models import (
+    CaptionCue,
     RenderedVideo,
     RenderRequest,
     Scene,
@@ -155,6 +156,7 @@ def test_subtitle_style_forwarded_from_config(tmp_path):
     subs = ctx.config.video.subtitles
     subs.font, subs.font_size = "Verdana", 80
     subs.color, subs.position = "#ffcc00", "top"
+    subs.highlight_color = "#123456"
     VideoAssembler(renderer).run(ctx)
 
     req = renderer.request
@@ -162,3 +164,14 @@ def test_subtitle_style_forwarded_from_config(tmp_path):
     assert req.subtitle_font_size == 80
     assert req.subtitle_color == "#ffcc00"
     assert req.subtitle_position == "top"
+    assert req.subtitle_highlight_color == "#123456"
+
+
+def test_caption_cues_forwarded_from_voice(tmp_path):
+    renderer = FakeRenderer()
+    ctx = _ctx(tmp_path)
+    ctx.voice.cues = [
+        CaptionCue(index=0, start_seconds=0.0, end_seconds=1.0, text="hi")
+    ]
+    VideoAssembler(renderer).run(ctx)
+    assert renderer.request.caption_cues == ctx.voice.cues

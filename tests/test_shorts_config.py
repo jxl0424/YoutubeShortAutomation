@@ -19,6 +19,8 @@ def test_load_default_config():
     assert config.video.width == 1080
     assert config.video.height == 1920
     assert config.video.scene_text is True
+    # Karaoke captions highlight the spoken word in the brand yellow.
+    assert config.video.subtitles.highlight_color == "#FFC400"
     # Shipped config has uploads ON; the Uploader stage still skips itself
     # (with a warning) on machines without OAuth credentials configured.
     assert config.upload.enabled is True

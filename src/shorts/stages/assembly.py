@@ -66,6 +66,8 @@ class VideoAssembler(PipelineStage):
             subtitle_font_size=subtitles.font_size,
             subtitle_color=subtitles.color,
             subtitle_position=subtitles.position,
+            subtitle_highlight_color=subtitles.highlight_color,
+            caption_cues=ctx.voice.cues,
             music_path=self._music_path(music),
             music_volume=music.volume,
         )

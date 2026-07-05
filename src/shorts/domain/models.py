@@ -101,11 +101,20 @@ class ScenePlan(_Model):
 # --------------------------------------------------------------------------- #
 # Voice
 # --------------------------------------------------------------------------- #
+class CaptionWord(_Model):
+    """One spoken word with its timing — the unit of karaoke highlighting."""
+
+    start_seconds: float = Field(ge=0)
+    end_seconds: float = Field(ge=0)
+    text: str
+
+
 class CaptionCue(_Model):
     index: int = Field(ge=0)
     start_seconds: float = Field(ge=0)
     end_seconds: float = Field(ge=0)
     text: str
+    words: list[CaptionWord] = Field(default_factory=list)
 
 
 class VoiceResult(_Model):
@@ -177,6 +186,10 @@ class RenderRequest(_Model):
     subtitle_font_size: int = Field(default=96, gt=0)
     subtitle_color: str = "white"
     subtitle_position: str = "bottom"
+    subtitle_highlight_color: str = "#FFC400"
+    # Word-timed cues for karaoke-style captions; when present (and word-timed)
+    # the renderer burns a generated ASS file instead of the plain SRT.
+    caption_cues: list[CaptionCue] = Field(default_factory=list)
     music_path: Path | None = None
     music_volume: float = Field(default=0.15, ge=0.0, le=1.0)
 

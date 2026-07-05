@@ -13,7 +13,13 @@ import sys
 import types
 from pathlib import Path
 
-from shorts.domain.models import RenderRequest, RenderScene, VisualType
+from shorts.domain.models import (
+    CaptionCue,
+    CaptionWord,
+    RenderRequest,
+    RenderScene,
+    VisualType,
+)
 from shorts.providers.render.moviepy_renderer import MoviePyRenderer
 
 
@@ -133,6 +139,81 @@ def test_ass_color_accepts_hex_and_rejects_unknown():
     assert MoviePyRenderer._ass_color("#ff8800") == "&H000088FF"
     assert MoviePyRenderer._ass_color("white") == "&H00FFFFFF"
     assert MoviePyRenderer._ass_color("not-a-color") is None
+
+
+# --- karaoke word-highlight captions (ASS) ----------------------------------- #
+def _word_cues():
+    return [
+        CaptionCue(
+            index=0,
+            start_seconds=0.0,
+            end_seconds=1.2,
+            text="hello big world",
+            words=[
+                CaptionWord(start_seconds=0.0, end_seconds=0.4, text="hello"),
+                CaptionWord(start_seconds=0.4, end_seconds=0.8, text="big"),
+                CaptionWord(start_seconds=0.8, end_seconds=1.2, text="world"),
+            ],
+        )
+    ]
+
+
+def test_karaoke_ass_one_event_per_word_with_highlight(tmp_path):
+    request = _request(tmp_path, caption_cues=_word_cues())
+    content = MoviePyRenderer()._write_karaoke_ass(request).read_text(encoding="utf-8")
+    events = [ln for ln in content.splitlines() if ln.startswith("Dialogue:")]
+    assert len(events) == 3
+    # Only the active word carries the highlight override (brand yellow BGR),
+    # closed by a reset to the primary color.
+    assert "{\\c&H00C4FF&}big{\\c&HFFFFFF&}" in events[1]
+    assert events[1].count("&H00C4FF") == 1
+    # Events run to the next word's start (no flicker); last to the cue end.
+    assert "0:00:00.40,0:00:00.80" in events[1]
+    assert "0:00:00.80,0:00:01.20" in events[2]
+
+
+def test_karaoke_ass_style_maps_config(tmp_path):
+    request = _request(
+        tmp_path,
+        subtitle_font="Verdana",
+        subtitle_font_size=96,
+        subtitle_color="yellow",
+        subtitle_position="top",
+        caption_cues=_word_cues(),
+    )
+    content = MoviePyRenderer()._write_karaoke_ass(request).read_text(encoding="utf-8")
+    # PlayRes = output resolution, so the configured px size maps 1:1.
+    assert "PlayResX: 1080" in content and "PlayResY: 1920" in content
+    style = next(ln for ln in content.splitlines() if ln.startswith("Style:"))
+    assert "Verdana,96," in style
+    assert "&H0000FFFF" in style  # yellow primary in ASS BGR
+    # top position: alignment 8, 288-space margin 30 scaled to 1920 -> 200
+    assert style.endswith(",8,40,40,200,1")
+
+
+def test_karaoke_ass_none_without_word_timings(tmp_path):
+    cues = [CaptionCue(index=0, start_seconds=0.0, end_seconds=1.0, text="hi")]
+    request = _request(tmp_path, caption_cues=cues)
+    assert MoviePyRenderer()._write_karaoke_ass(request) is None
+
+
+def test_finalize_burns_karaoke_ass_when_cues_have_words(tmp_path, monkeypatch):
+    raw = tmp_path / "render_raw.mp4"
+    raw.write_bytes(b"raw-video")
+    (tmp_path / "captions.srt").write_text("1\n00:00:00,000 --> 00:00:01,000\nhi\n")
+    captured = {}
+
+    def fake_run(cmd, **kwargs):
+        captured["cmd"] = cmd
+        Path(cmd[-1]).write_bytes(b"burned")
+
+    _stub_ffmpeg(monkeypatch, fake_run)
+    request = _request(tmp_path, caption_cues=_word_cues())
+    MoviePyRenderer()._finalize(raw, request)
+
+    vf = captured["cmd"][captured["cmd"].index("-vf") + 1]
+    assert vf == "subtitles=captions.ass"  # style is embedded, no force_style
+    assert (tmp_path / "captions.ass").exists()
 
 
 def test_finalize_burn_failure_falls_back_to_raw_video(tmp_path, monkeypatch):

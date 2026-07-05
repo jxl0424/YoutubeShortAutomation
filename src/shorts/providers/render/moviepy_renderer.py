@@ -378,6 +378,85 @@ class MoviePyRenderer(VideoRenderer):
         r, g, b = rgb
         return f"&H00{b:02X}{g:02X}{r:02X}"
 
+    @staticmethod
+    def _ass_timestamp(seconds: float) -> str:
+        centis = max(0, int(round(seconds * 100)))
+        hours, rem = divmod(centis, 360_000)
+        minutes, rem = divmod(rem, 6_000)
+        secs, cs = divmod(rem, 100)
+        return f"{hours}:{minutes:02d}:{secs:02d}.{cs:02d}"
+
+    def _write_karaoke_ass(self, request: RenderRequest) -> Path | None:
+        """Write a spoken-word-highlight ASS file next to the SRT.
+
+        One Dialogue event per word: the whole cue stays on screen while the
+        active word is recolored. Returns None when the cues carry no word
+        timings (SRT-only providers) so the caller falls back to force_style.
+        """
+        cues = [c for c in request.caption_cues if c.words]
+        if not (cues and request.subtitle_path):
+            return None
+        primary = self._ass_color(request.subtitle_color) or "&H00FFFFFF"
+        highlight = self._ass_color(request.subtitle_highlight_color) or "&H0000C4FF"
+        # Inline \c overrides take the alpha-less &HBBGGRR& form.
+        primary_inline = f"&H{primary[4:]}&"
+        highlight_inline = f"&H{highlight[4:]}&"
+        alignment, margin_v = _POSITIONS.get(
+            request.subtitle_position.strip().lower(), _POSITIONS["bottom"]
+        )
+        # This file declares PlayRes = output resolution, so font size maps 1:1
+        # to output pixels; only the 288-space constants need rescaling.
+        scale = request.height / _ASS_PLAY_RES_Y
+        style = (
+            f"Style: Karaoke,{request.subtitle_font},{request.subtitle_font_size},"
+            f"{primary},{primary},&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,"
+            f"{round(1.5 * scale)},0,{alignment},40,40,{round(margin_v * scale)},1"
+        )
+        lines = [
+            "[Script Info]",
+            "ScriptType: v4.00+",
+            f"PlayResX: {request.width}",
+            f"PlayResY: {request.height}",
+            "WrapStyle: 2",
+            "",
+            "[V4+ Styles]",
+            "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, "
+            "OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, "
+            "ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, "
+            "Alignment, MarginL, MarginR, MarginV, Encoding",
+            style,
+            "",
+            "[Events]",
+            "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, "
+            "Effect, Text",
+        ]
+        for cue in cues:
+            words = [w.text.replace("{", "(").replace("}", ")") for w in cue.words]
+            for i, word in enumerate(cue.words):
+                start = word.start_seconds
+                # Run each event to the next word's start (cue end for the
+                # last) so the cue never flickers between words.
+                end = (
+                    cue.words[i + 1].start_seconds
+                    if i + 1 < len(cue.words)
+                    else cue.end_seconds
+                )
+                if end <= start:
+                    continue
+                text = " ".join(
+                    f"{{\\c{highlight_inline}}}{w}{{\\c{primary_inline}}}"
+                    if j == i
+                    else w
+                    for j, w in enumerate(words)
+                )
+                lines.append(
+                    f"Dialogue: 0,{self._ass_timestamp(start)},"
+                    f"{self._ass_timestamp(end)},Karaoke,,0,0,0,,{text}"
+                )
+        ass_path = Path(request.subtitle_path).with_name("captions.ass")
+        ass_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        return ass_path
+
     def _finalize(self, raw_path: Path, request: RenderRequest) -> None:
         subtitle = request.subtitle_path
         if not (request.burn_subtitles and subtitle and Path(subtitle).exists()):
@@ -398,7 +477,18 @@ class MoviePyRenderer(VideoRenderer):
             # (avoids Windows path-escaping issues in the subtitles filter). The
             # in/out video paths must be absolute since cwd changes underneath us.
             subtitle_path = Path(subtitle)
-            style = self._force_style(request)
+            # Prefer karaoke word-highlight captions (self-styled ASS); fall
+            # back to the plain SRT + force_style when cues lack word timings.
+            karaoke = None
+            try:
+                karaoke = self._write_karaoke_ass(request)
+            except Exception as exc:
+                self._logger.warning("karaoke_ass_failed", error=str(exc))
+            if karaoke is not None:
+                vf = f"subtitles={karaoke.name}"
+            else:
+                style = self._force_style(request)
+                vf = f"subtitles={subtitle_path.name}:force_style='{style}'"
             subprocess.run(
                 [
                     ffmpeg,
@@ -406,7 +496,7 @@ class MoviePyRenderer(VideoRenderer):
                     "-i",
                     str(raw_path.resolve()),
                     "-vf",
-                    f"subtitles={subtitle_path.name}:force_style='{style}'",
+                    vf,
                     *quality,
                     "-c:a",
                     "copy",

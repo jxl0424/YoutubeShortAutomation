@@ -74,6 +74,7 @@ video:
     font_size: 96        # output-video pixels (96 ≈ 5% of frame height)
     color: white         # common name or #RRGGBB
     position: bottom     # bottom | center | top
+    highlight_color: "#FFC400"  # karaoke highlight on the spoken word (brand yellow)
   music:
     enabled: true
     # CC0 lo-fi loop shipped with the repo (see assets/music/README.md).

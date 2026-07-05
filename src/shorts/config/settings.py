@@ -113,6 +113,8 @@ class SubtitleConfig(_Section):
     font_size: int = Field(default=96, ge=1)
     color: str = "white"  # common name or #RRGGBB
     position: str = "bottom"  # bottom | center | top
+    # Karaoke highlight for the currently-spoken word (brand yellow).
+    highlight_color: str = "#FFC400"  # common name or #RRGGBB
 
 
 class MusicConfig(_Section):

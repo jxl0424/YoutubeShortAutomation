@@ -140,7 +140,15 @@ class KokoroVoiceProvider(VoiceProvider):
         words = text.split()
         if not words:
             return []
-        weights = [max(1, len(w)) for w in words]
+        # Kokoro pauses at punctuation, so a pure length-weighted spread drifts
+        # ahead of the audio after each sentence. Weight the pause into the
+        # preceding word (the highlight lingers there while the voice pauses).
+        weights = [
+            max(1, len(w))
+            + (4 if w.endswith((".", "!", "?")) else 0)
+            + (2 if w.endswith((",", ";", ":")) else 0)
+            for w in words
+        ]
         total = sum(weights)
         timed: list[TimedWord] = []
         start = 0.0

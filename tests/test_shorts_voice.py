@@ -49,11 +49,34 @@ def _ctx(*, script=True):
 # --- subtitle helpers ------------------------------------------------------ #
 def test_group_words_into_cues_chunks_by_max():
     words = [(float(i), float(i) + 1, f"w{i}") for i in range(10)]
-    cues = group_words_into_cues(words, max_words=8)
+    cues = group_words_into_cues(words, max_words=8, max_chars=100)
     assert len(cues) == 2
     assert cues[0].start_seconds == 0.0
     assert cues[0].end_seconds == 8.0  # 8th word (index 7) ends at 8.0
     assert cues[1].text == "w8 w9"
+
+
+def test_group_words_into_cues_defaults_to_four_words():
+    words = [(float(i), float(i) + 1, f"w{i}") for i in range(10)]
+    cues = group_words_into_cues(words)
+    assert [len(c.words) for c in cues] == [4, 4, 2]
+    assert cues[0].text == "w0 w1 w2 w3"
+
+
+def test_group_words_into_cues_breaks_early_on_long_words():
+    words = [
+        (0.0, 1.0, "extraordinary"),
+        (1.0, 2.0, "development"),
+        (2.0, 3.0, "today"),
+    ]
+    cues = group_words_into_cues(words)
+    assert [c.text for c in cues] == ["extraordinary", "development today"]
+
+
+def test_group_words_into_cues_keeps_word_timings():
+    words = [(0.0, 0.4, "hi"), (0.4, 1.0, "there")]
+    (cue,) = group_words_into_cues(words)
+    assert [(w.start_seconds, w.end_seconds, w.text) for w in cue.words] == words
 
 
 def test_cues_to_srt_formats_timestamps():
@@ -109,6 +132,15 @@ def test_kokoro_estimates_word_times_span_duration():
     assert len(words) == 3
     assert words[0][0] == 0.0
     assert abs(words[-1][1] - 6.0) < 1e-9  # last word ends at the audio duration
+
+
+def test_kokoro_estimate_weights_sentence_pauses():
+    # "abc." absorbs the pause Kokoro inserts, so it spans longer than a
+    # same-length word mid-sentence — keeping later highlights in sync.
+    words = KokoroVoiceProvider._estimate_word_times("abc abc. abc", 10.0)
+    spans = [end - start for start, end, _ in words]
+    assert spans[1] > spans[0]
+    assert abs(words[-1][1] - 10.0) < 1e-9
 
 
 def test_kokoro_synthesizes_mp3_and_cues(tmp_path):
