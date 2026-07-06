@@ -25,6 +25,7 @@ from .domain.models import GeneratedShort
 from .history import TopicHistory
 from .pipeline import build_pipeline
 from .retention import prune_output
+from .rotation import MediaRotation, list_music_tracks
 
 
 def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
@@ -102,6 +103,10 @@ def main(argv: Sequence[str] | None = None) -> int:
                 )
                 return 0
 
+    # Rotate the narrator voice + background music so the channel doesn't sound
+    # identical every day (each pick avoids the previous run's; see MediaRotation).
+    _rotate_media(config)
+
     # Progress goes to stderr so stdout stays clean for --json.
     print(f"Topic: {topic.title}  (score {topic.score:.3f})", file=sys.stderr)
     print("Generating short... (this can take a few minutes)", file=sys.stderr)
@@ -127,6 +132,26 @@ def main(argv: Sequence[str] | None = None) -> int:
     else:
         _print_short(short, topic.title)
     return 0
+
+
+def _rotate_media(config: ShortsConfig) -> None:
+    """Pick this run's narrator voice + music track, avoiding the last run's.
+
+    Overrides the two fields the pipeline already reads (``voice.voice`` and
+    ``video.music.path``). No-ops for whichever pool is unconfigured.
+    """
+    rotation = MediaRotation()
+    if config.voice.voices:
+        config.voice.voice = rotation.choose("voice", config.voice.voices)
+    tracks = list_music_tracks(config.video.music.dir)
+    if tracks:
+        picked = rotation.choose("music", [t.name for t in tracks])
+        config.video.music.path = f"{config.video.music.dir}/{picked}"
+    print(
+        f"Voice: {config.voice.voice}  |  Music: "
+        f"{Path(config.video.music.path).name if config.video.music.path else '-'}",
+        file=sys.stderr,
+    )
 
 
 def _load_topic(path: Path) -> SelectedTopic:

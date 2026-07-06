@@ -60,6 +60,9 @@ class MetadataConfig(_Section):
 class VoiceConfig(_Section):
     provider: str = "edge_tts"
     voice: str = "en-US-AriaNeural"
+    # Optional rotation pool: when non-empty the CLI picks one per run (avoiding
+    # the previous run's pick), otherwise `voice` is used unchanged.
+    voices: list[str] = Field(default_factory=list)
     # Note: current providers derive language from the voice name (e.g. Kokoro's
     # bf_/bm_ prefixes -> en-gb); this field is a forward-looking interface param.
     language: str = "en"
@@ -120,6 +123,9 @@ class SubtitleConfig(_Section):
 class MusicConfig(_Section):
     enabled: bool = False
     path: str | None = None
+    # Optional rotation folder: when set the CLI picks a random track from it
+    # per run (avoiding the previous run's), otherwise `path` is used unchanged.
+    dir: str | None = None
     volume: float = Field(default=0.15, ge=0.0, le=1.0)
 
 

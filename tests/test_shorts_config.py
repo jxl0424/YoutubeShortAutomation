@@ -16,11 +16,21 @@ def test_load_default_config():
     assert (config.script.min_words, config.script.max_words) == (40, 160)
     assert config.voice.provider == "kokoro"
     assert config.voice.voice == "af_heart"
+    # Narrator voices rotate per run (mixed genders + US/UK accents).
+    assert config.voice.voices == [
+        "af_heart",
+        "af_bella",
+        "am_michael",
+        "bf_emma",
+        "bm_george",
+    ]
     assert config.video.width == 1080
     assert config.video.height == 1920
     assert config.video.scene_text is True
     # Karaoke captions highlight the spoken word in the brand yellow.
     assert config.video.subtitles.highlight_color == "#FFC400"
+    # BGM rotates over the tracks in this folder.
+    assert config.video.music.dir == "assets/music"
     # Shipped config has uploads ON; the Uploader stage still skips itself
     # (with a warning) on machines without OAuth credentials configured.
     assert config.upload.enabled is True

@@ -33,7 +33,10 @@ voice:
   # `pip install -e ".[kokoro]"` plus the model files in models/kokoro/ (see
   # README). Set provider to edge_tts for a zero-setup online alternative.
   provider: kokoro
-  voice: af_heart       # Kokoro flagship voice (use en-US-AriaNeural etc. with edge_tts)
+  voice: af_heart       # fallback voice when `voices` below is empty
+  # Rotated per run (random, never repeating back-to-back): mixed genders +
+  # US/UK accents. af_=US female, am_=US male, bf_=UK female, bm_=UK male.
+  voices: [af_heart, af_bella, am_michael, bf_emma, bm_george]
   language: en
   rate: "+0%"
   kokoro_model_path: models/kokoro/kokoro-v1.0.onnx
@@ -77,8 +80,11 @@ video:
     highlight_color: "#FFC400"  # karaoke highlight on the spoken word (brand yellow)
   music:
     enabled: true
-    # CC0 lo-fi loop shipped with the repo (see assets/music/README.md).
-    # Relative paths resolve against the project root.
+    # CC0 tracks shipped with the repo (see assets/music/README.md). `dir` is
+    # rotated per run (random, never repeating back-to-back); every audio file
+    # dropped in there joins the rotation. `path` is the fallback when `dir` is
+    # empty. Relative paths resolve against the project root.
+    dir: assets/music
     path: assets/music/lofi-bubbles.mp3
     volume: 0.15
 
