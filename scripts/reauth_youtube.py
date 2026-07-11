@@ -38,9 +38,7 @@ DEFAULT_TOKEN_PATH = ROOT / ".secrets" / "youtube_token.json"
 def main() -> int:
     load_dotenv()
 
-    client_secrets = Path(
-        os.getenv("YOUTUBE_CLIENT_SECRETS") or DEFAULT_CLIENT_SECRETS
-    )
+    client_secrets = Path(os.getenv("YOUTUBE_CLIENT_SECRETS") or DEFAULT_CLIENT_SECRETS)
     token_path = Path(os.getenv("YOUTUBE_TOKEN_PATH") or DEFAULT_TOKEN_PATH)
 
     if not client_secrets.exists():
@@ -56,8 +54,7 @@ def main() -> int:
         from google_auth_oauthlib.flow import InstalledAppFlow
     except ImportError:
         print(
-            "Install the 'youtube' extra first: "
-            'pip install -e ".[youtube]"',
+            "Install the 'youtube' extra first: pip install -e \".[youtube]\"",
             file=sys.stderr,
         )
         return 1
