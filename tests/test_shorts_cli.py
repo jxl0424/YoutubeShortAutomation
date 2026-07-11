@@ -12,6 +12,7 @@ from shorts import cli
 from shorts.domain.exceptions import ShortsPipelineError
 from shorts.domain.models import GeneratedShort
 from shorts.history import TopicHistory
+from shorts.rotation import MediaRotation
 from trend_intelligence.domain.exceptions import TrendIntelligenceError
 from trend_intelligence.domain.models import (
     AggregatedTrend,
@@ -28,6 +29,18 @@ def history_store(tmp_path, monkeypatch):
     """Point the CLI's TopicHistory at a per-test file, never the real .state/."""
     path = tmp_path / "state" / "history.json"
     monkeypatch.setattr(cli, "TopicHistory", lambda p=path: TopicHistory(p))
+    return path
+
+
+@pytest.fixture(autouse=True)
+def rotation_store(tmp_path, monkeypatch):
+    """Point the CLI's MediaRotation at a per-test file, never the real .state/.
+
+    _rotate_media() constructs MediaRotation() at the default .state/rotation.json;
+    without this, running the CLI tests rewrites the real (tracked) state file.
+    """
+    path = tmp_path / "state" / "rotation.json"
+    monkeypatch.setattr(cli, "MediaRotation", lambda p=path: MediaRotation(p))
     return path
 
 
