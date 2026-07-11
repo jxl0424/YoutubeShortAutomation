@@ -85,10 +85,24 @@ jobs:
           git add -f .state/ 2>/dev/null || true
           if git diff --cached --quiet; then
             echo "No state change to commit."
-          else
-            git commit -m "chore(state): update dedupe/rotation [skip ci]"
-            git push origin HEAD:main
+            exit 0
           fi
+          git commit -m "chore(state): update dedupe/rotation [skip ci]"
+          # A Re-run checks out the original trigger SHA (stale), and a normal run
+          # can race another push; rebase our state commit onto the latest main
+          # (newest run wins on the regenerated .state/ files) and retry.
+          for attempt in 1 2 3; do
+            git fetch origin main || true
+            if git rebase -X theirs FETCH_HEAD && git push origin HEAD:main; then
+              echo "Persisted .state/ on attempt $attempt."
+              exit 0
+            fi
+            echo "Push attempt $attempt failed (remote advanced); retrying..."
+            git rebase --abort 2>/dev/null || true
+            sleep 3
+          done
+          echo "Could not persist .state/ after 3 attempts." >&2
+          exit 1
 
       - name: Upload run logs
         if: always()
