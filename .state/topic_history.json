@@ -1,28 +1,5 @@
 [
   {
-    "title": "StreetComplete: Fixing OpenStreetMap, one tiny quest at a time",
-    "keywords": [
-      "streetcomplete",
-      "fixing",
-      "openstreetmap",
-      "one",
-      "tiny",
-      "quest"
-    ],
-    "selected_at": "2026-07-07T22:58:45.909126+00:00",
-    "video_url": "https://www.youtube.com/shorts/wAROlmgMJfI"
-  },
-  {
-    "title": "Chat Control 1.0 and 2.0 Explained",
-    "keywords": [
-      "chat",
-      "control",
-      "explained"
-    ],
-    "selected_at": "2026-07-08T10:28:40.997598+00:00",
-    "video_url": "https://www.youtube.com/shorts/l1WrWe5yMS4"
-  },
-  {
     "title": "Grok 4.5",
     "keywords": [
       "grok"
@@ -152,5 +129,18 @@
     ],
     "selected_at": "2026-07-21T10:39:00.675100+00:00",
     "video_url": "https://www.youtube.com/shorts/XEj1i70xUcI"
+  },
+  {
+    "title": "OpenAI and Hugging Face address security incident during model evaluation",
+    "keywords": [
+      "openai",
+      "hugging",
+      "face",
+      "address",
+      "security",
+      "incident"
+    ],
+    "selected_at": "2026-07-22T10:41:33.337690+00:00",
+    "video_url": "https://www.youtube.com/shorts/S0cHwnOvjw4"
   }
 ]
