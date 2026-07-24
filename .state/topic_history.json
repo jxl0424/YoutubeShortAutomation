@@ -1,13 +1,5 @@
 [
   {
-    "title": "Grok 4.5",
-    "keywords": [
-      "grok"
-    ],
-    "selected_at": "2026-07-09T11:07:03.623164+00:00",
-    "video_url": "https://www.youtube.com/shorts/9qGLBdLZvNY"
-  },
-  {
     "title": "Modern decor may be straining people's brains",
     "keywords": [
       "modern",
@@ -155,5 +147,16 @@
     ],
     "selected_at": "2026-07-23T10:31:12.033839+00:00",
     "video_url": "https://www.youtube.com/shorts/fSRo5HYjxE0"
+  },
+  {
+    "title": "Writing by hand is good for your brain",
+    "keywords": [
+      "writing",
+      "hand",
+      "good",
+      "brain"
+    ],
+    "selected_at": "2026-07-24T10:31:10.828176+00:00",
+    "video_url": "https://www.youtube.com/shorts/d5fVYtG97WY"
   }
 ]
