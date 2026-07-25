@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import importlib.util
 import smtplib
 from datetime import date
+from pathlib import Path
 
 import pytest
 
@@ -15,6 +17,7 @@ from shorts.analytics.models import (
     WeeklyReport,
     WeekMetrics,
 )
+from shorts.analytics.provider import _SCOPES as PROVIDER_SCOPES
 from shorts.analytics.provider import YouTubeAnalyticsProvider
 from shorts.analytics.report import (
     build_html,
@@ -421,16 +424,110 @@ class _FakeProvider:
         return []
 
 
+def _cli_config(tmp_path, *, email: bool) -> str:
+    config = tmp_path / "shorts.yaml"
+    body = f"report:\n  output_dir: {(tmp_path / 'reports').as_posix()}\n"
+    if email:
+        body += "  email:\n    enabled: true\n"
+    config.write_text(body, encoding="utf-8")
+    return str(config)
+
+
+@pytest.fixture
+def smtp_env(monkeypatch):
+    monkeypatch.setenv("REPORT_SMTP_USERNAME", "sender@gmail.com")
+    monkeypatch.setenv("REPORT_SMTP_PASSWORD", "app-password")
+    monkeypatch.setenv("REPORT_EMAIL_TO", "brendan@example.com")
+
+
 def test_cli_writes_report_and_summary(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr("shorts.analytics.cli.YouTubeAnalyticsProvider", _FakeProvider)
-    config = tmp_path / "shorts.yaml"
-    config.write_text(
-        f"report:\n  output_dir: {(tmp_path / 'reports').as_posix()}\n",
-        encoding="utf-8",
-    )
-    assert report_main(["--config", str(config)]) == 0
+    assert report_main(["--config", _cli_config(tmp_path, email=False)]) == 0
     out = capsys.readouterr().out
     assert "SUMMARY: Views 120" in out
     reports = list((tmp_path / "reports").glob("weekly-*.md"))
     assert len(reports) == 1
     assert "Weekly Report" in reports[0].read_text(encoding="utf-8")
+
+
+def test_cli_emails_the_report(tmp_path, monkeypatch, capsys, smtp_env):
+    monkeypatch.setattr("shorts.analytics.cli.YouTubeAnalyticsProvider", _FakeProvider)
+    captured: dict = {}
+
+    def _fake_send(email_config, **kwargs):
+        captured["to"] = list(email_config.to)
+        captured.update(kwargs)
+        return list(email_config.to)
+
+    monkeypatch.setattr("shorts.analytics.cli.send_report_email", _fake_send)
+
+    assert report_main(["--config", _cli_config(tmp_path, email=True)]) == 0
+    out = capsys.readouterr().out
+    assert "EMAILED: 1 recipient(s)" in out
+    # The Actions log for this repo is public — never echo the address.
+    assert "brendan@example.com" not in out
+
+    assert captured["to"] == ["brendan@example.com"]
+    assert "<table" in captured["html"]
+    assert "Weekly Report" in captured["markdown"]
+    assert captured["attachment_name"].startswith("weekly-")
+    assert captured["attachment_name"].endswith(".md")
+
+
+def test_cli_no_email_flag_skips_sending(tmp_path, monkeypatch, capsys, smtp_env):
+    monkeypatch.setattr("shorts.analytics.cli.YouTubeAnalyticsProvider", _FakeProvider)
+
+    def _unexpected(*args, **kwargs):  # pragma: no cover - must never run
+        raise AssertionError("--no-email must not send")
+
+    monkeypatch.setattr("shorts.analytics.cli.send_report_email", _unexpected)
+
+    argv = ["--config", _cli_config(tmp_path, email=True), "--no-email"]
+    assert report_main(argv) == 0
+    out = capsys.readouterr().out
+    assert "EMAILED" not in out
+    assert list((tmp_path / "reports").glob("weekly-*.md"))  # file still written
+
+
+def test_cli_fails_the_run_when_the_email_cannot_be_sent(
+    tmp_path, monkeypatch, capsys, smtp_env
+):
+    # The whole point of the report is landing in an inbox: a swallowed send
+    # failure is the bug this change exists to prevent.
+    monkeypatch.setattr("shorts.analytics.cli.YouTubeAnalyticsProvider", _FakeProvider)
+
+    def _boom(*args, **kwargs):
+        raise ReportError("SMTP authentication failed")
+
+    monkeypatch.setattr("shorts.analytics.cli.send_report_email", _boom)
+
+    assert report_main(["--config", _cli_config(tmp_path, email=True)]) == 1
+    captured = capsys.readouterr()
+    assert "Report email failed" in captured.err
+    # The report file survives, so the run is still diagnosable.
+    assert list((tmp_path / "reports").glob("weekly-*.md"))
+
+
+# --------------------------------------------------------------------------- #
+# scripts/reauth_youtube.py — token minting
+# --------------------------------------------------------------------------- #
+def _reauth_module():
+    path = Path(__file__).resolve().parents[1] / "scripts" / "reauth_youtube.py"
+    spec = importlib.util.spec_from_file_location("reauth_youtube", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_reauth_report_scopes_match_the_analytics_provider():
+    # The script deliberately duplicates the scope list (it must run without
+    # importing src/); this keeps the copy honest.
+    assert _reauth_module().SCOPE_SETS["report"]["scopes"] == PROVIDER_SCOPES
+
+
+def test_reauth_report_token_is_distinct_from_the_upload_token():
+    # Clobbering the upload token would silently break the daily publish.
+    upload, report = (_reauth_module().SCOPE_SETS[k] for k in ("upload", "report"))
+    assert upload["token_name"] != report["token_name"]
+    assert upload["secret"] != report["secret"]
+    assert not any("upload" in scope for scope in report["scopes"])

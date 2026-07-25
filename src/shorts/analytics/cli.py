@@ -1,9 +1,14 @@
 """Command-line entry point for the weekly channel report.
 
-Fetches the last two full weeks of channel analytics and writes a markdown
-report to ``report.output_dir``. Progress goes to stderr; stdout carries the
-report path and a one-line ``SUMMARY:`` (which the scheduled wrapper surfaces
-as a toast).
+Fetches the last two full weeks of channel analytics, writes a markdown report
+to ``report.output_dir`` and emails it (``report.email``). Progress goes to
+stderr; stdout carries the report path and a one-line ``SUMMARY:`` (which the
+scheduled wrapper surfaces as a toast).
+
+A failed send fails the run. The report exists to land in an inbox, so treating
+delivery as best-effort is what let it go missing for weeks unnoticed — a
+non-zero exit is what turns GitHub's failed-workflow email into the alarm. Use
+``--no-email`` for a local run that only writes the file.
 """
 
 from __future__ import annotations
@@ -18,10 +23,11 @@ from pathlib import Path
 from trend_intelligence.logging.setup import configure_logging
 
 from ..config.settings import PROJECT_ROOT, ShortsConfig
-from ..domain.exceptions import ShortsError
+from ..domain.exceptions import ReportError, ShortsError
+from .mailer import send_report_email
 from .models import WeeklyReport
 from .provider import YouTubeAnalyticsProvider
-from .report import build_markdown, summary_line, week_range
+from .report import build_html, build_markdown, summary_line, week_range
 
 
 def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
@@ -33,6 +39,11 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         "--config", help="Path to the Stage 2 config YAML (default: config/shorts.yaml)"
     )
     parser.add_argument("--log-level", default="WARNING", help="Logging level")
+    parser.add_argument(
+        "--no-email",
+        action="store_true",
+        help="Write the report file only; skip the email (local dry run)",
+    )
     return parser.parse_args(argv)
 
 
@@ -73,10 +84,28 @@ def main(argv: Sequence[str] | None = None) -> int:
         out_dir = PROJECT_ROOT / out_dir
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / f"weekly-{this_end}.md"
-    out_path.write_text(build_markdown(report), encoding="utf-8")
+    markdown = build_markdown(report)
+    out_path.write_text(markdown, encoding="utf-8")
 
     print(f"Report: {out_path}")
     print(f"SUMMARY: {summary_line(report)}")
+
+    email = config.report.email
+    if args.no_email or not email.enabled:
+        return 0
+    try:
+        recipients = send_report_email(
+            email,
+            subject=f"{email.subject_prefix}: {this_start} to {this_end}",
+            html=build_html(report),
+            markdown=markdown,
+            attachment_name=out_path.name,
+        )
+    except ReportError as exc:
+        print(f"Report email failed: {exc}", file=sys.stderr)
+        return 1
+    # Count only — the GitHub Actions log for this repo is public.
+    print(f"EMAILED: {len(recipients)} recipient(s)")
     return 0
 
 
