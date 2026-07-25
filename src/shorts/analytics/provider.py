@@ -10,6 +10,7 @@ injectable so tests never touch Google.
 
 from __future__ import annotations
 
+import sys
 from collections.abc import Callable
 from datetime import date
 from pathlib import Path
@@ -37,6 +38,21 @@ _WEEK_METRICS = {
     "comments": "comments",
     "shares": "shares",
 }
+
+
+_REAUTH_HINT = (
+    "mint one locally with `python scripts/reauth_youtube.py --scopes report` "
+    "and paste it into the YOUTUBE_REPORT_TOKEN_JSON secret"
+)
+
+
+def _is_interactive() -> bool:
+    """Whether a browser consent could actually be completed here.
+
+    False on a GitHub runner and under Task Scheduler — both of which would
+    otherwise sit on ``run_local_server`` until the job times out.
+    """
+    return bool(getattr(sys.stdin, "isatty", lambda: False)())
 
 
 class YouTubeAnalyticsProvider:
@@ -68,6 +84,14 @@ class YouTubeAnalyticsProvider:
             raise ReportError(
                 "YouTube client secrets not found (set YOUTUBE_CLIENT_SECRETS)"
             )
+        # Checked before the Google imports so it stays a fast, readable failure:
+        # an unset/empty YOUTUBE_REPORT_TOKEN_JSON secret would otherwise reach
+        # run_local_server and hang the job until its timeout.
+        if not self._token_path.exists() and not _is_interactive():
+            raise ReportError(
+                f"no report OAuth token at {self._token_path} and no terminal to "
+                f"consent in — {_REAUTH_HINT}"
+            )
         try:
             from google.auth.transport.requests import Request
             from google.oauth2.credentials import Credentials
@@ -87,6 +111,13 @@ class YouTubeAnalyticsProvider:
             if creds and creds.expired and creds.refresh_token:
                 creds.refresh(Request())
             else:
+                # Present but unrefreshable (revoked, or minted without a
+                # refresh_token). Same reasoning as the check above.
+                if not _is_interactive():
+                    raise ReportError(
+                        f"the report OAuth token at {self._token_path} cannot be "
+                        f"refreshed and no terminal is available — {_REAUTH_HINT}"
+                    )
                 flow = InstalledAppFlow.from_client_secrets_file(
                     self._client_secrets_path, _SCOPES
                 )

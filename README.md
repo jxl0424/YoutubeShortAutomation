@@ -198,28 +198,69 @@ user (while logged on), appending output to `logs/daily-<yyyyMMdd>.log`. Notes:
   QA failures always land at `qa_fail_privacy` (`private`) for review.
 - Remove with `Unregister-ScheduledTask -TaskName "YouTubeShortsDaily"`.
 
-## Weekly channel report (Windows)
+## Weekly channel report (emailed every Monday)
 
-A markdown growth report every Monday — views, watch time, subscribers
-gained/lost, and the week's top videos, each compared with the week before:
+A growth report every Monday — views, watch time, subscribers gained/lost, and
+the week's top videos, each compared with the week before — **emailed** as an
+HTML summary with the raw markdown attached.
 
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\register_report_schedule.ps1 -Time "09:30"
-Start-ScheduledTask -TaskName "YouTubeShortsWeeklyReport"   # optional test trigger
-```
+[`.github/workflows/weekly-report.yml`](.github/workflows/weekly-report.yml) runs
+it on GitHub's runners (Mondays 08:30 UTC, plus **Run workflow** on demand), so
+it does not depend on a machine being awake. The report is also uploaded as a
+`weekly-report` artifact, since `reports/` is gitignored.
 
-The task runs [`scripts/run_weekly_report.ps1`](scripts/run_weekly_report.ps1)
-(`shorts-report` / `python -m shorts.analytics` manually), writing
-`reports/weekly-<date>.md` and raising a toast with the headline numbers. Setup:
+**A failed send fails the workflow on purpose.** The report only matters if it
+arrives, so a best-effort send is worthless: enable *Settings → Notifications →
+Actions → only failed workflows* on GitHub and a broken report emails you instead
+of disappearing quietly.
 
-- Enable the **YouTube Analytics API** in the same Google Cloud project as the
-  OAuth client (Data API alone is not enough — analytics queries 403 without it).
-- The first run opens a browser consent for two **read-only** scopes and caches
-  a token at `.secrets/youtube_report_token.json` — separate from the upload
-  token, whose narrow `youtube.upload` scope stays untouched.
-- The report window always covers the 7 full days ending yesterday (and the 7
-  before that for deltas), no matter when the task fires. Analytics data can
-  lag up to ~48h, so the freshest days may still be settling.
+### Setup
+
+1. Enable the **YouTube Analytics API** in the same Google Cloud project as the
+   OAuth client (the Data API alone is not enough — analytics queries 403 with
+   `accessNotConfigured`), and add the two **read-only** scopes
+   (`youtube.readonly`, `yt-analytics.readonly`) on the consent screen.
+2. Mint the report's own token — separate from the upload token, whose narrow
+   `youtube.upload` scope stays untouched:
+
+   ```powershell
+   .venv\Scripts\python.exe scripts\reauth_youtube.py --scopes report
+   ```
+
+   It must print `refresh_token: PRESENT`. Keep the consent screen **In
+   production**; a Testing-status app's refresh token expires after 7 days.
+3. Add these repository secrets (**Settings → Secrets and variables → Actions**).
+   `YOUTUBE_CLIENT_SECRETS_JSON` is already there from the daily workflow:
+
+   | Secret | Value |
+   | --- | --- |
+   | `YOUTUBE_REPORT_TOKEN_JSON` | contents of `.secrets/youtube_report_token.json` |
+   | `REPORT_SMTP_USERNAME` | the sending address (see below) |
+   | `REPORT_SMTP_PASSWORD` | its SMTP app password |
+   | `REPORT_EMAIL_TO` | recipients, comma-separated |
+
+**The sender cannot be an Outlook/Microsoft address** — Microsoft retired SMTP
+basic auth and app passwords on 2026-04-30. Gmail with a 16-character app
+password (2-Step Verification required) is the shipped default; any SMTP host
+works via `report.email` in `config/shorts.yaml`. *Receiving* at Outlook is fine.
+
+Recipients live in `REPORT_EMAIL_TO`, not in the YAML, because this repo is
+public — and being a secret also keeps the address masked in the run log.
+
+### Running it locally
+
+`shorts-report` (or `python -m shorts.analytics`) writes
+`reports/weekly-<date>.md` and emails it, reading the same three `REPORT_*`
+values from `.env`. Add `--no-email` to only write the file.
+[`scripts/run_weekly_report.ps1`](scripts/run_weekly_report.ps1) wraps that with
+a toast and is still registerable as a local task
+(`scripts/register_report_schedule.ps1`), though the workflow above supersedes
+it.
+
+The report window always covers the 7 full days ending yesterday (and the 7
+before that for deltas), no matter when the run fires — so a Monday run covers
+Mon–Sun regardless of cron drift. Analytics data can lag up to ~48h, so the
+freshest days may still be settling.
 
 ## Cloud archive & local retention
 

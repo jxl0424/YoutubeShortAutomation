@@ -401,6 +401,21 @@ def test_top_videos_title_join_is_best_effort():
     assert videos[0].title == ""
 
 
+def test_missing_token_fails_fast_when_not_interactive(tmp_path, monkeypatch):
+    # On a runner there is no browser to consent in: without this guard the job
+    # blocks on run_local_server until the workflow timeout kills it, reporting
+    # "cancelled" instead of "your token secret is missing".
+    monkeypatch.setattr("shorts.analytics.provider._is_interactive", lambda: False)
+    secrets = tmp_path / "client_secrets.json"
+    secrets.write_text("{}", encoding="utf-8")
+    provider = YouTubeAnalyticsProvider(
+        client_secrets_path=str(secrets),
+        token_path=str(tmp_path / "absent.json"),
+    )
+    with pytest.raises(ReportError, match="reauth_youtube.py --scopes report"):
+        provider.channel_snapshot()
+
+
 def test_analytics_error_wrapped():
     analytics = FakeAnalyticsService(RuntimeError("boom"))
     with pytest.raises(ReportError):
