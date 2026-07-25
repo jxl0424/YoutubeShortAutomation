@@ -72,11 +72,11 @@ python -m shorts --topic-json topic.json
 Or from Python:
 
 ```python
-from trend_intelligence.domain.models import SelectedTopic   # from Stage 1
+from trend_intelligence.domain.models import SelectedTopic  # from Stage 1
 from shorts import ShortsConfig, build_pipeline
 
 pipeline = build_pipeline(ShortsConfig.load())
-package = pipeline.generate(selected_topic)   # -> output/<slug>/ with video.mp4, etc.
+package = pipeline.generate(selected_topic)  # -> output/<slug>/ with video.mp4, etc.
 ```
 
 Output folder: `video.mp4`, `thumbnail.png`, `captions.srt`, `metadata.json`,
