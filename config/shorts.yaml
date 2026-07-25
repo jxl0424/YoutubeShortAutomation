@@ -144,6 +144,21 @@ report:
   top_videos: 5
   client_secrets_env: YOUTUBE_CLIENT_SECRETS
   token_path: .secrets/youtube_report_token.json
+  email:
+    # How the report actually reaches you. Recipients live in REPORT_EMAIL_TO
+    # (not here — this repo is public), credentials in REPORT_SMTP_USERNAME /
+    # REPORT_SMTP_PASSWORD. A failed send fails the run on purpose: silence is
+    # what let the report go missing for weeks.
+    #
+    # The sender CANNOT be an Outlook/Microsoft address — Microsoft retired SMTP
+    # basic auth and app passwords on 2026-04-30. Gmail + a 16-char app password
+    # is the default (receiving at Outlook is unaffected).
+    enabled: true
+    subject_prefix: DaDailyScroll weekly report
+    smtp_host: smtp.gmail.com
+    smtp_port: 587
+    starttls: true          # false => implicit TLS (e.g. port 465)
+    attach_markdown: true   # the .md alongside the HTML body, for archiving
 
 http:
   timeout_seconds: 60   # image generation (Pollinations) can be slow

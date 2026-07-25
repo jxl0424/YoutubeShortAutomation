@@ -8,6 +8,7 @@ conventions as Stage 1 so nothing requires code changes to retune behaviour.
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +22,17 @@ from ..domain.models import VisualType
 # src/shorts/config/settings.py -> project root is 3 levels up.
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_CONFIG_PATH = PROJECT_ROOT / "config" / "shorts.yaml"
+
+
+def split_recipients(raw: str | None) -> list[str]:
+    """Split a ``REPORT_EMAIL_TO``-style env value into addresses.
+
+    Accepts comma or semicolon separators so a value pasted from a mail client
+    works unchanged.
+    """
+    if not raw:
+        return []
+    return [part.strip() for part in re.split(r"[,;]", raw) if part.strip()]
 
 
 class _Section(BaseModel):
@@ -194,6 +206,34 @@ class RetentionConfig(_Section):
     keep_runs: int = Field(default=5, ge=1)
 
 
+class ReportEmailConfig(_Section):
+    """Emailing the weekly report (the report's actual delivery mechanism).
+
+    Credentials AND recipients come from env vars: this repo is public, so an
+    address in the YAML would be scraped. ``to`` stays available for private
+    forks and local overrides; ``to_env`` wins when both are set.
+
+    Note the sender cannot be an Outlook/Microsoft address — Microsoft retired
+    SMTP basic auth (and app passwords) on 2026-04-30. Gmail with an app
+    password is the shipped default; any SMTP host works.
+    """
+
+    enabled: bool = False
+    to: list[str] = Field(default_factory=list)
+    to_env: str = "REPORT_EMAIL_TO"  # comma- or semicolon-separated
+    from_address: str = ""  # defaults to the SMTP username
+    subject_prefix: str = "DaDailyScroll weekly report"
+    smtp_host: str = "smtp.gmail.com"
+    smtp_port: int = Field(default=587, ge=1, le=65535)
+    starttls: bool = True  # False => implicit TLS (SMTP_SSL), e.g. port 465
+    attach_markdown: bool = True
+    timeout_seconds: float = Field(default=30.0, gt=0)
+    username_env: str = "REPORT_SMTP_USERNAME"
+    password_env: str = "REPORT_SMTP_PASSWORD"
+    username: str | None = None
+    password: str | None = None
+
+
 class ReportConfig(_Section):
     """Weekly channel-growth report (``shorts-report``).
 
@@ -205,6 +245,7 @@ class ReportConfig(_Section):
     top_videos: int = Field(default=5, ge=1)
     client_secrets_env: str = "YOUTUBE_CLIENT_SECRETS"
     token_path: str = ".secrets/youtube_report_token.json"
+    email: ReportEmailConfig = Field(default_factory=ReportEmailConfig)
 
 
 class HttpConfig(_Section):
@@ -278,3 +319,11 @@ class ShortsConfig(BaseModel):
         generated = self.assets.generated
         if generated.api_key is None and generated.api_key_env:
             generated.api_key = os.getenv(generated.api_key_env)
+        email = self.report.email
+        if email.username is None and email.username_env:
+            email.username = os.getenv(email.username_env)
+        if email.password is None and email.password_env:
+            email.password = os.getenv(email.password_env)
+        # Recipients are env-sourced too (public repo); YAML `to` is the override.
+        if not email.to and email.to_env:
+            email.to = split_recipients(os.getenv(email.to_env))

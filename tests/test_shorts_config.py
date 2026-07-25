@@ -9,7 +9,10 @@ from shorts.domain.exceptions import ShortsConfigurationError
 from shorts.domain.models import VisualType
 
 
-def test_load_default_config():
+def test_load_default_config(monkeypatch):
+    # The report recipient is env-sourced; unset it so a developer's own
+    # REPORT_EMAIL_TO cannot mask the "nothing committed" assertion below.
+    monkeypatch.delenv("REPORT_EMAIL_TO", raising=False)
     config = ShortsConfig.load(load_env=False)
     assert config.script.provider == "nvidia_nim"
     assert config.enrichment.enabled is True
@@ -54,6 +57,17 @@ def test_load_default_config():
     assert config.report.top_videos == 5
     assert config.report.token_path == ".secrets/youtube_report_token.json"
     assert config.report.token_path != config.upload.token_path
+    # Email delivery is ON — a report nobody receives is the bug this fixes.
+    email = config.report.email
+    assert email.enabled is True
+    assert (email.smtp_host, email.smtp_port, email.starttls) == (
+        "smtp.gmail.com",
+        587,
+        True,
+    )
+    assert email.attach_markdown is True
+    # This repo is public: no recipient address may ever live in the YAML.
+    assert email.to == []
 
 
 def test_defaults_without_yaml():
@@ -71,6 +85,27 @@ def test_secrets_resolved_from_env(monkeypatch):
     config = ShortsConfig.load(load_env=False)
     assert config.script.api_key == "nv-123"
     assert config.assets.stock.pexels_api_key == "pex-456"
+
+
+def test_report_email_secrets_resolved_from_env(monkeypatch):
+    monkeypatch.setenv("REPORT_SMTP_USERNAME", "sender@gmail.com")
+    monkeypatch.setenv("REPORT_SMTP_PASSWORD", "app-password")
+    monkeypatch.setenv("REPORT_EMAIL_TO", "a@example.com, b@example.com;c@example.com")
+    email = ShortsConfig.load(load_env=False).report.email
+    assert email.username == "sender@gmail.com"
+    assert email.password == "app-password"
+    # Comma or semicolon, whitespace tolerated (values get pasted by hand).
+    assert email.to == ["a@example.com", "b@example.com", "c@example.com"]
+
+
+def test_report_email_yaml_recipients_win_over_env(monkeypatch, tmp_path):
+    monkeypatch.setenv("REPORT_EMAIL_TO", "env@example.com")
+    config_path = tmp_path / "shorts.yaml"
+    config_path.write_text(
+        "report:\n  email:\n    to: [yaml@example.com]\n", encoding="utf-8"
+    )
+    config = ShortsConfig.load(config_path, load_env=False)
+    assert config.report.email.to == ["yaml@example.com"]
 
 
 def test_missing_file_raises(tmp_path):

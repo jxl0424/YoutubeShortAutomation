@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import smtplib
 from datetime import date
 
 import pytest
 
 from shorts.analytics.cli import main as report_main
+from shorts.analytics.mailer import send_report_email
 from shorts.analytics.models import (
     ChannelSnapshot,
     VideoStat,
@@ -14,7 +16,13 @@ from shorts.analytics.models import (
     WeekMetrics,
 )
 from shorts.analytics.provider import YouTubeAnalyticsProvider
-from shorts.analytics.report import build_markdown, summary_line, week_range
+from shorts.analytics.report import (
+    build_html,
+    build_markdown,
+    summary_line,
+    week_range,
+)
+from shorts.config.settings import ReportEmailConfig
 from shorts.domain.exceptions import ReportError
 
 
@@ -139,6 +147,159 @@ def test_markdown_without_videos_says_so():
 def test_summary_line():
     line = summary_line(_report())
     assert line == "Views 120 (+40 (+50%)) | net subs +5 | watch 43 min | subs total 12"
+
+
+# --------------------------------------------------------------------------- #
+# HTML rendering (the emailed body)
+# --------------------------------------------------------------------------- #
+GREEN, RED = "#177245", "#b3261e"
+
+
+def _row_html(html: str, label: str) -> str:
+    """The <tr> fragment carrying `label` (rows are emitted one per metric)."""
+    start = html.index(label)
+    return html[start : html.index("</tr>", start)]
+
+
+def test_html_carries_the_same_numbers_as_the_markdown():
+    html = build_html(_report())
+    assert "DA DAILY SCROLL" in html
+    assert "+40 (+50%)" in html  # same delta strings as the markdown renderer
+    assert "https://www.youtube.com/shorts/abc123" in html
+    assert "78.5%" in html
+    assert "12" in html and "345" in html  # channel totals
+
+
+def test_html_escapes_video_titles():
+    report = _report(
+        top_videos=[
+            VideoStat(
+                video_id="abc123",
+                title='<script>alert("x")</script> & more',
+                views=90,
+            )
+        ]
+    )
+    html = build_html(report)
+    assert "<script>alert" not in html
+    assert "&lt;script&gt;" in html
+    assert "&amp; more" in html
+
+
+def test_html_colours_a_rise_in_subscribers_lost_as_bad():
+    # Every other metric is "higher is better"; losing more subs is not.
+    html = build_html(_report())
+    assert RED in _row_html(html, "Subscribers lost")
+    assert GREEN in _row_html(html, "Views")
+
+
+def test_html_colours_a_flat_metric_neutrally():
+    flat = _metrics(views=10)
+    html = build_html(_report(this_week=flat, last_week=_metrics(views=10)))
+    row = _row_html(html, "Views")
+    assert GREEN not in row and RED not in row
+
+
+def test_html_without_videos_says_so():
+    assert "No video views recorded this week." in build_html(_report(top_videos=[]))
+
+
+# --------------------------------------------------------------------------- #
+# mailer
+# --------------------------------------------------------------------------- #
+class FakeSMTP:
+    def __init__(self, *, fail_on: str | None = None):
+        self.fail_on = fail_on
+        self.logged_in: tuple[str, str] | None = None
+        self.sent: list = []
+        self.quit_called = False
+
+    def login(self, username, password):
+        if self.fail_on == "login":
+            raise smtplib.SMTPAuthenticationError(535, b"bad app password")
+        self.logged_in = (username, password)
+
+    def send_message(self, message):
+        if self.fail_on == "send":
+            raise smtplib.SMTPRecipientsRefused({})
+        self.sent.append(message)
+
+    def quit(self):
+        self.quit_called = True
+
+
+def _email_config(**kw) -> ReportEmailConfig:
+    defaults = dict(
+        enabled=True,
+        to=["brendan@example.com"],
+        username="sender@gmail.com",
+        password="app-password",
+    )
+    defaults.update(kw)
+    return ReportEmailConfig(**defaults)
+
+
+def _send(config, smtp, **kw):
+    payload = dict(
+        subject="Weekly report",
+        html="<p>hello</p>",
+        markdown="# hello",
+        attachment_name="weekly-2026-07-03.md",
+    )
+    payload.update(kw)
+    return send_report_email(config, smtp_factory=lambda: smtp, **payload)
+
+
+def test_send_builds_html_alternative_with_markdown_fallback_and_attachment():
+    smtp = FakeSMTP()
+    recipients = _send(_email_config(to=["a@example.com", "b@example.com"]), smtp)
+
+    assert recipients == ["a@example.com", "b@example.com"]
+    assert smtp.logged_in == ("sender@gmail.com", "app-password")
+    assert smtp.quit_called
+    message = smtp.sent[0]
+    assert message["To"] == "a@example.com, b@example.com"
+    assert message["From"] == "sender@gmail.com"  # defaults to the SMTP username
+    assert message["Subject"] == "Weekly report"
+    assert message.get_body(preferencelist=("html",)).get_content() == "<p>hello</p>\n"
+    assert "# hello" in message.get_body(preferencelist=("plain",)).get_content()
+    attachments = list(message.iter_attachments())
+    assert [a.get_filename() for a in attachments] == ["weekly-2026-07-03.md"]
+    assert attachments[0].get_content().strip() == "# hello"
+
+
+def test_send_honours_an_explicit_from_address():
+    smtp = FakeSMTP()
+    _send(_email_config(from_address="reports@example.com"), smtp)
+    assert smtp.sent[0]["From"] == "reports@example.com"
+
+
+def test_send_can_omit_the_attachment():
+    smtp = FakeSMTP()
+    _send(_email_config(attach_markdown=False), smtp)
+    assert list(smtp.sent[0].iter_attachments()) == []
+
+
+def test_send_without_recipients_raises():
+    with pytest.raises(ReportError, match="REPORT_EMAIL_TO"):
+        _send(_email_config(to=[]), FakeSMTP())
+
+
+def test_send_without_credentials_raises():
+    with pytest.raises(ReportError, match="REPORT_SMTP_PASSWORD"):
+        _send(_email_config(password=None), FakeSMTP())
+
+
+def test_send_wraps_an_auth_failure_with_an_actionable_message():
+    smtp = FakeSMTP(fail_on="login")
+    with pytest.raises(ReportError, match="app password"):
+        _send(_email_config(), smtp)
+    assert smtp.quit_called  # the connection is closed even when login fails
+
+
+def test_send_wraps_a_delivery_failure():
+    with pytest.raises(ReportError, match="failed"):
+        _send(_email_config(), FakeSMTP(fail_on="send"))
 
 
 # --------------------------------------------------------------------------- #
