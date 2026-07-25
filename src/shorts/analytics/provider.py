@@ -1,10 +1,17 @@
 """Read-only YouTube channel analytics (Analytics API v2 + Data API v3).
 
-Same OAuth/lazy-import conventions as the upload provider, but with read-only
-scopes and a SEPARATE token cache, so the upload token keeps its narrow
-``youtube.upload`` scope. First run opens a browser consent; the YouTube
-Analytics API must be enabled in the same Google Cloud project as the OAuth
-client (else the query 403s with accessNotConfigured). Both services are
+Deliberately split by auth type to keep the OAuth surface as small as possible:
+
+* **Analytics API** — private per-channel metrics, so OAuth is unavoidable. Uses
+  ``yt-analytics.readonly`` alone, with a SEPARATE token cache so the upload
+  token keeps its narrow ``youtube.upload`` scope.
+* **Data API** — only ever reads *public* data here (channel totals and video
+  titles), so it authenticates with a plain API key. Doing this over OAuth would
+  mean requesting ``youtube.readonly``, a second sensitive scope, purely to read
+  things anyone can read anonymously.
+
+The YouTube Analytics API must be enabled in the same Google Cloud project as
+the OAuth client, else queries 403 with accessNotConfigured. Both services are
 injectable so tests never touch Google.
 """
 
@@ -21,10 +28,9 @@ from trend_intelligence.logging.setup import get_logger
 from ..domain.exceptions import ReportError
 from .models import ChannelSnapshot, VideoStat, WeekMetrics
 
-_SCOPES = [
-    "https://www.googleapis.com/auth/youtube.readonly",
-    "https://www.googleapis.com/auth/yt-analytics.readonly",
-]
+# Analytics only. `youtube.readonly` is deliberately NOT here: the Data API
+# calls below read public data and go through an API key instead.
+_SCOPES = ["https://www.googleapis.com/auth/yt-analytics.readonly"]
 
 # One Analytics API metric name per WeekMetrics field, in query order.
 _WEEK_METRICS = {
@@ -61,17 +67,25 @@ class YouTubeAnalyticsProvider:
         *,
         client_secrets_path: str | None = None,
         token_path: str = ".secrets/youtube_report_token.json",
+        api_key: str | None = None,
+        channel_id: str | None = None,
         build_services: Callable[[], tuple[Any, Any]] | None = None,
     ) -> None:
         self._client_secrets_path = client_secrets_path
         self._token_path = Path(token_path)
+        self._api_key = api_key
+        self._channel_id = channel_id
         self._build_services = build_services
         self._services: tuple[Any, Any] | None = None
         self._logger = get_logger("shorts.report")
 
     # --- auth / service construction (mirrors upload provider) ---------- #
     def _get_services(self) -> tuple[Any, Any]:
-        """Return ``(data_service, analytics_service)``, building once."""
+        """Return ``(data_service, analytics_service)``, building once.
+
+        ``data_service`` is None when no API key is configured — it only serves
+        optional public lookups, so the report degrades rather than fails.
+        """
         if self._services is not None:
             return self._services
         if self._build_services is not None:
@@ -124,18 +138,37 @@ class YouTubeAnalyticsProvider:
                 creds = flow.run_local_server(port=0)
             self._token_path.parent.mkdir(parents=True, exist_ok=True)
             self._token_path.write_text(creds.to_json(), encoding="utf-8")
-        self._services = (
-            build("youtube", "v3", credentials=creds),
-            build("youtubeAnalytics", "v2", credentials=creds),
+        # The Data API gets the API key, never `creds` — that is the whole point
+        # of dropping youtube.readonly.
+        data = (
+            build("youtube", "v3", developerKey=self._api_key)
+            if self._api_key
+            else None
         )
+        self._services = (data, build("youtubeAnalytics", "v2", credentials=creds))
         return self._services
 
     # --- queries --------------------------------------------------------- #
-    def channel_snapshot(self) -> ChannelSnapshot:
+    def channel_snapshot(self) -> ChannelSnapshot | None:
+        """Lifetime channel totals, or None when not configured.
+
+        Needs an API key and a channel id (``mine=True`` is not available
+        without OAuth). Unconfigured is a soft skip — the week-over-week body of
+        the report, which is the point, does not depend on this. A configured
+        but failing lookup is loud: that is a wrong id or a bad key.
+        """
         data, _ = self._get_services()
+        if data is None or not self._channel_id:
+            self._logger.warning(
+                "channel_totals_skipped",
+                reason="set YOUTUBE_API_KEY and report.channel_id to include them",
+            )
+            return None
         try:
             response = (
-                data.channels().list(part="snippet,statistics", mine=True).execute()
+                data.channels()
+                .list(part="snippet,statistics", id=self._channel_id)
+                .execute()
             )
         except ReportError:
             raise
@@ -143,10 +176,12 @@ class YouTubeAnalyticsProvider:
             raise ReportError(f"channel statistics query failed: {exc}") from exc
         items = response.get("items") or []
         if not items:
-            raise ReportError("no channel found for the authorized account")
+            raise ReportError(f"no channel found with id {self._channel_id!r}")
         stats = items[0].get("statistics") or {}
         return ChannelSnapshot(
             title=(items[0].get("snippet") or {}).get("title", ""),
+            # Public subscriber counts are rounded to 3 significant figures above
+            # 1,000, and omitted entirely when the channel hides them.
             subscribers=int(stats.get("subscriberCount", 0)),
             total_views=int(stats.get("viewCount", 0)),
             video_count=int(stats.get("videoCount", 0)),
@@ -220,6 +255,8 @@ class YouTubeAnalyticsProvider:
 
     def _attach_titles(self, data: Any, videos: list[VideoStat]) -> None:
         """Join watch-page titles onto the stats (best-effort)."""
+        if data is None:  # no API key: the report falls back to bare video ids
+            return
         try:
             response = (
                 data.videos()

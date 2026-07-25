@@ -46,12 +46,14 @@ class FakeDataService:
     def __init__(self, *, channels=None, videos=None):
         self._channels = channels or {}
         self._videos = videos or {}
+        self.channel_queries: list = []
 
     def channels(self):
         service = self
 
         class _Channels:
-            def list(self, *, part, mine):
+            def list(self, *, part, id):  # noqa: A002 (Google's param name)
+                service.channel_queries.append(id)
                 return FakeRequest(service._channels)
 
         return _Channels()
@@ -82,12 +84,17 @@ class FakeAnalyticsService:
         return _Reports()
 
 
-def _provider(data=None, analytics=None):
+_DEFAULT = object()  # lets a test pass data=None (i.e. "no API key configured")
+
+
+def _provider(data=_DEFAULT, analytics=None, **kw):
+    kw.setdefault("channel_id", "UC_test")
     return YouTubeAnalyticsProvider(
         build_services=lambda: (
-            data or FakeDataService(),
+            FakeDataService() if data is _DEFAULT else data,
             analytics or FakeAnalyticsService({}),
-        )
+        ),
+        **kw,
     )
 
 
@@ -140,6 +147,17 @@ def test_markdown_includes_totals_deltas_and_links():
     assert "| Net subscribers | 5 | 0 | +5 |" in md  # zero last week: no percent
     assert "[Test Short](https://www.youtube.com/shorts/abc123)" in md
     assert "78.5%" in md
+
+
+def test_markdown_omits_channel_totals_when_unavailable():
+    md = build_markdown(_report(channel=None))
+    assert "## Channel totals" not in md
+    assert "# Channel — Weekly Report" in md  # falls back to a generic heading
+    assert "| Views | 120 | 80 | +40 (+50%) |" in md  # the body still stands
+
+
+def test_summary_line_without_channel_totals():
+    assert "subs total" not in summary_line(_report(channel=None))
 
 
 def test_markdown_without_videos_says_so():
@@ -201,6 +219,16 @@ def test_html_colours_a_flat_metric_neutrally():
     html = build_html(_report(this_week=flat, last_week=_metrics(views=10)))
     row = _row_html(html, "Views")
     assert GREEN not in row and RED not in row
+
+
+def test_html_omits_channel_totals_when_unavailable():
+    html = build_html(_report(channel=None))
+    # "Total views" is unique to the totals card ("Subscribers" also appears as
+    # the gained/lost week-over-week rows, which must survive).
+    assert "Total views" not in html
+    assert "Total views" in build_html(_report())
+    assert "Week over week" in html
+    assert _row_html(html, "Subscribers gained")
 
 
 def test_html_without_videos_says_so():
@@ -327,11 +355,31 @@ def test_channel_snapshot_parses_string_counts():
     assert snapshot == ChannelSnapshot(
         title="DA DAILY SCROLL", subscribers=12, total_views=345, video_count=6
     )
+    # Looked up by id, not mine=True: the Data API call carries an API key, not
+    # OAuth, so we never request the sensitive youtube.readonly scope.
+    assert data.channel_queries == ["UC_test"]
 
 
 def test_channel_snapshot_without_channel_raises():
-    with pytest.raises(ReportError):
+    with pytest.raises(ReportError, match="UC_test"):
         _provider(data=FakeDataService(channels={"items": []})).channel_snapshot()
+
+
+def test_channel_snapshot_skipped_when_unconfigured():
+    # No API key (data service is None) => soft skip, not a failure: the
+    # week-over-week body is the point of the report.
+    assert _provider(data=None, channel_id="UC_test").channel_snapshot() is None
+    # Key present but no channel id => same.
+    assert _provider(channel_id="").channel_snapshot() is None
+
+
+def test_top_videos_without_an_api_key_falls_back_to_bare_ids():
+    analytics = FakeAnalyticsService({"rows": [["abc123", 90, 78.5, 4]]})
+    videos = _provider(data=None, analytics=analytics).top_videos(
+        date(2026, 6, 27), date(2026, 7, 3), 5
+    )
+    assert videos[0].video_id == "abc123"
+    assert videos[0].title == ""
 
 
 def test_week_metrics_maps_by_column_header():
@@ -538,6 +586,14 @@ def test_reauth_report_scopes_match_the_analytics_provider():
     # The script deliberately duplicates the scope list (it must run without
     # importing src/); this keeps the copy honest.
     assert _reauth_module().SCOPE_SETS["report"]["scopes"] == PROVIDER_SCOPES
+
+
+def test_report_requests_only_the_analytics_scope():
+    # youtube.readonly is a second sensitive scope that Google prompts to verify.
+    # The Data API lookups here are public and use an API key instead, so the
+    # OAuth grant stays at exactly one scope.
+    assert PROVIDER_SCOPES == ["https://www.googleapis.com/auth/yt-analytics.readonly"]
+    assert not any("youtube.readonly" in scope for scope in PROVIDER_SCOPES)
 
 
 def test_reauth_report_token_is_distinct_from_the_upload_token():

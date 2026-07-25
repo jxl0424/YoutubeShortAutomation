@@ -11,9 +11,10 @@ refresh_token, which then dies in ~1 hour). Publish the OAuth consent screen to
 Two independent tokens, selected with ``--scopes``:
 
 * ``upload`` (default) — the narrow ``youtube.upload`` scope used to publish.
-* ``report`` — the two READ-ONLY scopes the weekly report needs. Kept separate
-  so the upload token's narrow scope stays untouched. Needs the YouTube
-  Analytics API enabled in the same Google Cloud project.
+* ``report`` — ``yt-analytics.readonly`` alone. Kept separate so the upload
+  token's narrow scope stays untouched. Needs the YouTube Analytics API enabled
+  in the same Google Cloud project. The report's public lookups (channel totals,
+  video titles) use YOUTUBE_API_KEY instead of a second sensitive scope.
 
 Usage (from the repo root, with the venv):
     .venv/Scripts/python.exe scripts/reauth_youtube.py
@@ -44,10 +45,9 @@ SCOPE_SETS = {
         "secret": "YOUTUBE_TOKEN_JSON",
     },
     "report": {
-        "scopes": [
-            "https://www.googleapis.com/auth/youtube.readonly",
-            "https://www.googleapis.com/auth/yt-analytics.readonly",
-        ],
+        # Analytics only. The report's Data API lookups are public and go
+        # through YOUTUBE_API_KEY, so `youtube.readonly` is not requested.
+        "scopes": ["https://www.googleapis.com/auth/yt-analytics.readonly"],
         "token_name": "youtube_report_token.json",
         "secret": "YOUTUBE_REPORT_TOKEN_JSON",
     },

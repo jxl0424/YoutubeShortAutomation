@@ -87,6 +87,14 @@ def test_secrets_resolved_from_env(monkeypatch):
     assert config.assets.stock.pexels_api_key == "pex-456"
 
 
+def test_report_public_lookup_settings_resolved_from_env(monkeypatch):
+    monkeypatch.setenv("YOUTUBE_API_KEY", "yt-key-789")
+    monkeypatch.setenv("YOUTUBE_CHANNEL_ID", "UCabcdef")
+    report = ShortsConfig.load(load_env=False).report
+    assert report.api_key == "yt-key-789"
+    assert report.channel_id == "UCabcdef"
+
+
 def test_report_email_secrets_resolved_from_env(monkeypatch):
     monkeypatch.setenv("REPORT_SMTP_USERNAME", "sender@gmail.com")
     monkeypatch.setenv("REPORT_SMTP_PASSWORD", "app-password")

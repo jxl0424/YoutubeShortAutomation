@@ -136,14 +136,20 @@ retention:
   keep_runs: 5
 
 report:
-  # Weekly channel-growth report (shorts-report / scripts/run_weekly_report.ps1).
-  # Read-only scopes with a SEPARATE token from the upload one; the first run
-  # opens a browser consent and needs the YouTube Analytics API enabled in the
-  # same Google Cloud project as the OAuth client.
+  # Weekly channel-growth report (shorts-report / .github/workflows/weekly-report.yml).
+  # OAuth is yt-analytics.readonly ONLY, with a SEPARATE token from the upload
+  # one; the first run opens a browser consent and needs the YouTube Analytics
+  # API enabled in the same Google Cloud project as the OAuth client.
   output_dir: reports
   top_videos: 5
   client_secrets_env: YOUTUBE_CLIENT_SECRETS
   token_path: .secrets/youtube_report_token.json
+  # Lifetime totals + video titles are PUBLIC, so they use YOUTUBE_API_KEY
+  # rather than the sensitive youtube.readonly scope. Both optional: without
+  # them the report omits the totals block and shows bare video ids. Set the
+  # channel id here or in YOUTUBE_CHANNEL_ID (Studio > Settings > Channel >
+  # Advanced). Note YouTube rounds PUBLIC subscriber counts above 1,000.
+  channel_id: ""
   email:
     # How the report actually reaches you. Recipients live in REPORT_EMAIL_TO
     # (not here — this repo is public), credentials in REPORT_SMTP_USERNAME /

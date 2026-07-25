@@ -245,6 +245,14 @@ class ReportConfig(_Section):
     top_videos: int = Field(default=5, ge=1)
     client_secrets_env: str = "YOUTUBE_CLIENT_SECRETS"
     token_path: str = ".secrets/youtube_report_token.json"
+    # Lifetime channel totals and video titles are PUBLIC data, read with an API
+    # key rather than OAuth — asking for the sensitive `youtube.readonly` scope
+    # just to read them is not worth it. Both are optional: without them the
+    # report simply omits the totals block and falls back to bare video ids.
+    channel_id: str = ""
+    channel_id_env: str = "YOUTUBE_CHANNEL_ID"
+    api_key_env: str = "YOUTUBE_API_KEY"
+    api_key: str | None = None
     email: ReportEmailConfig = Field(default_factory=ReportEmailConfig)
 
 
@@ -319,6 +327,11 @@ class ShortsConfig(BaseModel):
         generated = self.assets.generated
         if generated.api_key is None and generated.api_key_env:
             generated.api_key = os.getenv(generated.api_key_env)
+        report = self.report
+        if report.api_key is None and report.api_key_env:
+            report.api_key = os.getenv(report.api_key_env)
+        if not report.channel_id and report.channel_id_env:
+            report.channel_id = os.getenv(report.channel_id_env) or ""
         email = self.report.email
         if email.username is None and email.username_env:
             email.username = os.getenv(email.username_env)

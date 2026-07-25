@@ -60,6 +60,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     provider = YouTubeAnalyticsProvider(
         client_secrets_path=os.getenv(config.report.client_secrets_env),
         token_path=config.report.token_path,
+        api_key=config.report.api_key,
+        channel_id=config.report.channel_id,
     )
     this_start, this_end, prev_start, prev_end = week_range(date.today())
 

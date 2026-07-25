@@ -58,6 +58,11 @@ jobs:
       - name: Build + email the report
         env:
           YOUTUBE_CLIENT_SECRETS: .secrets/client_secrets.json
+          # Optional: lifetime totals + video titles, read as PUBLIC data with an
+          # API key rather than the sensitive youtube.readonly OAuth scope. The
+          # report drops the totals block if these are absent.
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          YOUTUBE_CHANNEL_ID: ${{ secrets.YOUTUBE_CHANNEL_ID }}
           REPORT_SMTP_USERNAME: ${{ secrets.REPORT_SMTP_USERNAME }}
           REPORT_SMTP_PASSWORD: ${{ secrets.REPORT_SMTP_PASSWORD }}
           REPORT_EMAIL_TO: ${{ secrets.REPORT_EMAIL_TO }}

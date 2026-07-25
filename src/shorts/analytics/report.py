@@ -98,16 +98,21 @@ def _week_rows(
 def build_markdown(report: WeeklyReport) -> str:
     tw, lw, ch = report.this_week, report.last_week, report.channel
     lines = [
-        f"# {ch.title or 'Channel'} — Weekly Report",
+        f"# {(ch.title if ch else '') or 'Channel'} — Weekly Report",
         "",
         f"**Week:** {tw.start} → {tw.end} (compared with {lw.start} → {lw.end})",
         "",
-        "## Channel totals",
-        "",
-        "| Subscribers | Total views | Videos |",
-        "| ---: | ---: | ---: |",
-        f"| {ch.subscribers:,} | {ch.total_views:,} | {ch.video_count:,} |",
-        "",
+    ]
+    if ch:
+        lines += [
+            "## Channel totals",
+            "",
+            "| Subscribers | Total views | Videos |",
+            "| ---: | ---: | ---: |",
+            f"| {ch.subscribers:,} | {ch.total_views:,} | {ch.video_count:,} |",
+            "",
+        ]
+    lines += [
         "## Week over week",
         "",
         "| Metric | This week | Last week | Change |",
@@ -168,7 +173,31 @@ def build_html(report: WeeklyReport) -> str:
     """The emailed body — same numbers as ``build_markdown``, readable in a
     mail client (markdown tables render as raw pipes in Outlook)."""
     tw, lw, ch = report.this_week, report.last_week, report.channel
-    title = escape(ch.title or "Channel")
+    title = escape((ch.title if ch else "") or "Channel")
+
+    if ch:
+        totals = f"""\
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+   style="border-collapse:collapse;width:100%;background:#f8fafc;
+   border:1px solid #e3e8ee;border-radius:8px;margin:0 0 24px">
+    <tr>
+      <td style="{_TD};border-bottom:none;text-align:center">
+        <div style="font-size:22px;font-weight:700">{ch.subscribers:,}</div>
+        <div style="font-size:11px;color:#5b6472;text-transform:uppercase">Subscribers</div>
+      </td>
+      <td style="{_TD};border-bottom:none;text-align:center">
+        <div style="font-size:22px;font-weight:700">{ch.total_views:,}</div>
+        <div style="font-size:11px;color:#5b6472;text-transform:uppercase">Total views</div>
+      </td>
+      <td style="{_TD};border-bottom:none;text-align:center">
+        <div style="font-size:22px;font-weight:700">{ch.video_count:,}</div>
+        <div style="font-size:11px;color:#5b6472;text-transform:uppercase">Videos</div>
+      </td>
+    </tr>
+  </table>
+"""
+    else:
+        totals = ""
 
     week_rows = "".join(
         "<tr>"
@@ -231,25 +260,7 @@ def build_html(report: WeeklyReport) -> str:
     compared with {lw.start} &rarr; {lw.end}
   </p>
 
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
-   style="border-collapse:collapse;width:100%;background:#f8fafc;
-   border:1px solid #e3e8ee;border-radius:8px;margin:0 0 24px">
-    <tr>
-      <td style="{_TD};border-bottom:none;text-align:center">
-        <div style="font-size:22px;font-weight:700">{ch.subscribers:,}</div>
-        <div style="font-size:11px;color:#5b6472;text-transform:uppercase">Subscribers</div>
-      </td>
-      <td style="{_TD};border-bottom:none;text-align:center">
-        <div style="font-size:22px;font-weight:700">{ch.total_views:,}</div>
-        <div style="font-size:11px;color:#5b6472;text-transform:uppercase">Total views</div>
-      </td>
-      <td style="{_TD};border-bottom:none;text-align:center">
-        <div style="font-size:22px;font-weight:700">{ch.video_count:,}</div>
-        <div style="font-size:11px;color:#5b6472;text-transform:uppercase">Videos</div>
-      </td>
-    </tr>
-  </table>
-
+{totals}
   <h2 style="{_FONT};font-size:15px;color:#1b1f24;margin:0 0 8px">Week over week</h2>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
    style="border-collapse:collapse;width:100%;margin:0 0 24px">
@@ -275,9 +286,11 @@ def build_html(report: WeeklyReport) -> str:
 def summary_line(report: WeeklyReport) -> str:
     """One glanceable line for the completion toast / log."""
     tw, lw = report.this_week, report.last_week
-    return (
+    line = (
         f"Views {tw.views:,} ({_int_delta(tw.views, lw.views)}) | "
         f"net subs {tw.net_subscribers:+,} | "
-        f"watch {tw.watch_minutes:,} min | "
-        f"subs total {report.channel.subscribers:,}"
+        f"watch {tw.watch_minutes:,} min"
     )
+    if report.channel:
+        line += f" | subs total {report.channel.subscribers:,}"
+    return line

@@ -12,7 +12,11 @@ class _Model(BaseModel):
 
 
 class ChannelSnapshot(_Model):
-    """Lifetime totals from the Data API ``channels.list`` statistics."""
+    """Lifetime totals from the Data API ``channels.list`` statistics.
+
+    Public figures (fetched with an API key, not OAuth): YouTube rounds
+    subscriber counts above 1,000 to 3 significant figures.
+    """
 
     title: str = ""
     subscribers: int = 0
@@ -51,9 +55,13 @@ class VideoStat(_Model):
 
 
 class WeeklyReport(_Model):
-    """Everything the renderer needs, already fetched."""
+    """Everything the renderer needs, already fetched.
 
-    channel: ChannelSnapshot
+    ``channel`` is optional: lifetime totals need an API key and a channel id,
+    and the week-over-week body stands on its own without them.
+    """
+
+    channel: ChannelSnapshot | None = None
     this_week: WeekMetrics
     last_week: WeekMetrics
     top_videos: list[VideoStat] = Field(default_factory=list)

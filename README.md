@@ -218,8 +218,8 @@ of disappearing quietly.
 
 1. Enable the **YouTube Analytics API** in the same Google Cloud project as the
    OAuth client (the Data API alone is not enough — analytics queries 403 with
-   `accessNotConfigured`), and add the two **read-only** scopes
-   (`youtube.readonly`, `yt-analytics.readonly`) on the consent screen.
+   `accessNotConfigured`), and add **`yt-analytics.readonly`** on the consent
+   screen. That is the only OAuth scope the report asks for.
 2. Mint the report's own token — separate from the upload token, whose narrow
    `youtube.upload` scope stays untouched:
 
@@ -229,6 +229,8 @@ of disappearing quietly.
 
    It must print `refresh_token: PRESENT`. Keep the consent screen **In
    production**; a Testing-status app's refresh token expires after 7 days.
+   Sensitive scopes make Google offer verification — as the app's only user you
+   can skip it and click through *Advanced → Go to … (unsafe)* at consent.
 3. Add these repository secrets (**Settings → Secrets and variables → Actions**).
    `YOUTUBE_CLIENT_SECRETS_JSON` is already there from the daily workflow:
 
@@ -238,6 +240,19 @@ of disappearing quietly.
    | `REPORT_SMTP_USERNAME` | the sending address (see below) |
    | `REPORT_SMTP_PASSWORD` | its SMTP app password |
    | `REPORT_EMAIL_TO` | recipients, comma-separated |
+   | `YOUTUBE_API_KEY` | *optional* — see below |
+   | `YOUTUBE_CHANNEL_ID` | *optional* — Studio → Settings → Channel → Advanced |
+
+### Why only one OAuth scope
+
+Lifetime channel totals and video titles are **public** data, so the report reads
+them with a plain API key instead of requesting `youtube.readonly` — a second
+*sensitive* scope, whose only extra power here would be reading things anyone can
+read anonymously. Both values are optional: without them the report omits the
+totals block and shows bare video ids, and the week-over-week body (the point of
+the report) is unaffected. One caveat: YouTube rounds **public** subscriber
+counts above 1,000 to three significant figures, so the totals card can trail the
+exact number in Studio.
 
 **The sender cannot be an Outlook/Microsoft address** — Microsoft retired SMTP
 basic auth and app passwords on 2026-04-30. Gmail with a 16-character app
