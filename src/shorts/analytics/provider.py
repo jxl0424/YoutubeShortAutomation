@@ -118,12 +118,28 @@ class YouTubeAnalyticsProvider:
 
         creds = None
         if self._token_path.exists():
-            creds = Credentials.from_authorized_user_file(
-                str(self._token_path), _SCOPES
-            )
+            try:
+                creds = Credentials.from_authorized_user_file(
+                    str(self._token_path), _SCOPES
+                )
+            except Exception as exc:
+                raise ReportError(
+                    f"the report OAuth token at {self._token_path} is not valid "
+                    f"authorized-user JSON ({exc}) — check the secret holds the "
+                    f"whole file; {_REAUTH_HINT}"
+                ) from exc
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
-                creds.refresh(Request())
+                try:
+                    creds.refresh(Request())
+                except Exception as exc:
+                    # invalid_grant: revoked, or minted without offline access so
+                    # it was never durable. Unrecoverable without a fresh consent.
+                    raise ReportError(
+                        f"Google rejected the report OAuth token at "
+                        f"{self._token_path} ({exc}) — it has been revoked or was "
+                        f"never durable; {_REAUTH_HINT}"
+                    ) from exc
             else:
                 # Present but unrefreshable (revoked, or minted without a
                 # refresh_token). Same reasoning as the check above.

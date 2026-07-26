@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import smtplib
 from datetime import date
 from pathlib import Path
@@ -461,6 +462,56 @@ def test_missing_token_fails_fast_when_not_interactive(tmp_path, monkeypatch):
         token_path=str(tmp_path / "absent.json"),
     )
     with pytest.raises(ReportError, match="reauth_youtube.py --scopes report"):
+        provider.channel_snapshot()
+
+
+def test_unparseable_token_file_is_reported_clearly(tmp_path, monkeypatch):
+    # A truncated paste into the secret used to surface as a raw traceback.
+    pytest.importorskip("google.oauth2")  # only present with the 'youtube' extra
+    monkeypatch.setattr("shorts.analytics.provider._is_interactive", lambda: False)
+    secrets = tmp_path / "client_secrets.json"
+    secrets.write_text("{}", encoding="utf-8")
+    token = tmp_path / "token.json"
+    token.write_text("{not json", encoding="utf-8")
+    provider = YouTubeAnalyticsProvider(
+        client_secrets_path=str(secrets), token_path=str(token)
+    )
+    with pytest.raises(ReportError, match="whole file"):
+        provider.channel_snapshot()
+
+
+def test_revoked_token_is_reported_clearly(tmp_path, monkeypatch):
+    # The real failure mode: Google answers invalid_grant for a revoked or
+    # never-durable refresh token. It used to escape as a raw traceback.
+    pytest.importorskip("google.oauth2")
+    from google.auth.exceptions import RefreshError
+    from google.oauth2.credentials import Credentials
+
+    def _revoked(self, request):
+        raise RefreshError("invalid_grant: Bad Request")
+
+    monkeypatch.setattr(Credentials, "refresh", _revoked)
+    monkeypatch.setattr("shorts.analytics.provider._is_interactive", lambda: False)
+
+    secrets = tmp_path / "client_secrets.json"
+    secrets.write_text("{}", encoding="utf-8")
+    token = tmp_path / "token.json"
+    token.write_text(
+        json.dumps(
+            {
+                "refresh_token": "stale",
+                "client_id": "cid",
+                "client_secret": "csecret",
+                "token": "expired-access-token",
+                "expiry": "2020-01-01T00:00:00Z",
+            }
+        ),
+        encoding="utf-8",
+    )
+    provider = YouTubeAnalyticsProvider(
+        client_secrets_path=str(secrets), token_path=str(token)
+    )
+    with pytest.raises(ReportError, match="revoked or was never durable"):
         provider.channel_snapshot()
 
 
