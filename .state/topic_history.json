@@ -1,18 +1,5 @@
 [
   {
-    "title": "Modern decor may be straining people's brains",
-    "keywords": [
-      "modern",
-      "decor",
-      "may",
-      "straining",
-      "people's",
-      "brains"
-    ],
-    "selected_at": "2026-07-12T10:06:11.377471+00:00",
-    "video_url": "https://www.youtube.com/shorts/irTo0C75KCU"
-  },
-  {
     "title": "Ask HN: Add flag for AI-generated articles",
     "keywords": [
       "ask",
@@ -167,5 +154,18 @@
     ],
     "selected_at": "2026-07-25T09:59:31.990868+00:00",
     "video_url": "https://www.youtube.com/shorts/6wUOmjVQ93k"
+  },
+  {
+    "title": "The new rules of context engineering for Claude 5 generation models",
+    "keywords": [
+      "rules",
+      "context",
+      "engineering",
+      "claude",
+      "generation",
+      "models"
+    ],
+    "selected_at": "2026-07-26T10:12:22.389632+00:00",
+    "video_url": "https://www.youtube.com/shorts/1wXdqz82isU"
   }
 ]
