@@ -480,6 +480,34 @@ def test_unparseable_token_file_is_reported_clearly(tmp_path, monkeypatch):
         provider.channel_snapshot()
 
 
+def test_token_survives_a_bom_from_copy_paste(tmp_path, monkeypatch):
+    # A Windows copy-paste into a GitHub secret can prepend U+FEFF, which makes
+    # json.load fail at char 0 with no hint as to why.
+    pytest.importorskip("google.oauth2")
+    monkeypatch.setattr("shorts.analytics.provider._is_interactive", lambda: False)
+    secrets = tmp_path / "client_secrets.json"
+    secrets.write_text("{}", encoding="utf-8")
+    token = tmp_path / "token.json"
+    payload = json.dumps(
+        {
+            "refresh_token": "rt",
+            "client_id": "cid",
+            "client_secret": "cs",
+            "token": "at",
+        }
+    )
+    token.write_text("﻿" + payload + "\n", encoding="utf-8")
+
+    provider = YouTubeAnalyticsProvider(
+        client_secrets_path=str(secrets), token_path=str(token), channel_id="UC_x"
+    )
+    # Parsing succeeds, so this gets as far as the (unstubbed) Google client
+    # rather than dying at char 0.
+    with pytest.raises(Exception) as excinfo:
+        provider.channel_snapshot()
+    assert "not valid" not in str(excinfo.value)
+
+
 def test_revoked_token_is_reported_clearly(tmp_path, monkeypatch):
     # The real failure mode: Google answers invalid_grant for a revoked or
     # never-durable refresh token. It used to escape as a raw traceback.

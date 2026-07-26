@@ -17,6 +17,7 @@ injectable so tests never touch Google.
 
 from __future__ import annotations
 
+import json
 import sys
 from collections.abc import Callable
 from datetime import date
@@ -119,9 +120,14 @@ class YouTubeAnalyticsProvider:
         creds = None
         if self._token_path.exists():
             try:
-                creds = Credentials.from_authorized_user_file(
-                    str(self._token_path), _SCOPES
+                # Parsed here rather than via from_authorized_user_file so the
+                # token survives the round-trip through a GitHub secret: utf-8-sig
+                # drops the BOM a Windows copy-paste can prepend, and .strip()
+                # the stray whitespace. Both otherwise fail at char 0.
+                info = json.loads(
+                    self._token_path.read_text(encoding="utf-8-sig").strip()
                 )
+                creds = Credentials.from_authorized_user_info(info, _SCOPES)
             except Exception as exc:
                 raise ReportError(
                     f"the report OAuth token at {self._token_path} is not valid "
